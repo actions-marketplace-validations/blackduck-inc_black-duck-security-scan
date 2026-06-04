@@ -11,8 +11,11 @@ inputs:
   coverity_user:
     description: 'Coverity user name'
     required: false
-  coverity_passphrase:
+  coverity_password:
     description: 'Coverity password'
+    required: false
+  coverity_passphrase:
+    description: 'Coverity password (deprecated, use coverity_password instead)'
     required: false
   coverity_project_name:
     description: 'Coverity Project Name'
@@ -87,7 +90,10 @@ inputs:
     description: 'Polaris parent branch name'
     required: false
   polaris_test_sca_type:
-    description: 'Polaris test type to trigger signature scan or package manager scan'
+    description: 'Polaris SCA test type (SCA-SIGNATURE, SCA-PACKAGE, SCA-BINARY)'
+    required: false
+  polaris_artifactToUpload:
+    description: 'Path to binary or archive file for Polaris SCA Binary scan. Required when polaris_test_sca_type is set to SCA-BINARY.'
     required: false
   polaris_test_sast_type:
     description: 'Polaris test type to trigger sigma rapid scan or full scan'
@@ -311,5 +317,5 @@ outputs:
   status:
     description: 'The numeric exit code returned by the Black Duck Security Scan.'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
