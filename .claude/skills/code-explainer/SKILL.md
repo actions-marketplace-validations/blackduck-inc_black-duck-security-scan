@@ -12,33 +12,83 @@ Provides comprehensive analysis and explanation of the Black Duck Security Scan 
 Run this skill when the user asks questions like:
 - "Explain how this codebase works"
 - "What is the architecture of this project?"
-- "How does the data flow through the system?"
+- "How does the scan run end-to-end?"
 - "What happens when the action runs?"
 - "Trace the execution from start to finish"
 - "What design patterns are used?"
 - "How do the components interact?"
 - "Show me the module structure"
-- "How are errors handled end-to-end?"
 
-## Analysis Modes
+## How to Use
 
-This skill operates in different modes based on the user's question:
+When explaining code:
 
-### Mode 1: Architecture Analysis
-For questions about structure, organization, and components.
-
-### Mode 2: Flow Analysis
-For questions about execution, data flow, and control flow.
-
-### Mode 3: Pattern Analysis
-For questions about design patterns and architectural decisions.
-
-### Mode 4: Comprehensive Analysis
-For general "explain how this works" questions.
+1. **Read the relevant source files FIRST** — Don't rely on CLAUDE.md summaries alone for line-level questions
+2. **Map to the right area** using the Component Inventory and Common Questions tables below
+3. **Provide file:line citations** for all references
+4. **Show relationships** between components, not just what they do
+5. **Explain trade-offs** in architectural decisions
 
 ---
 
-## Mode 1: Architecture Analysis
+## Common Questions → File Mapping
+
+| Question | Start here | Key files |
+|---|---|---|
+| "How does the scan run end-to-end?" | `src/main.ts:run()` | main.ts, bridge-cli.ts, tools-parameter.ts |
+| "How does Bridge CLI get downloaded?" | `bridge-cli.ts:validateBridgePath()` | bridge-cli.ts, download-utility.ts, retry-helper.ts |
+| "How does air-gap mode work?" | `bridge-cli.ts` | inputs.ts (NETWORK_AIRGAP), bridge-cli.ts download skip |
+| "How are inputs validated?" | `validators.ts` | validators.ts, bridge-cli.ts:prepareCommand() |
+| "How is SARIF uploaded?" | `main.ts:50-75` | main.ts, factory/, service/impl/ |
+| "How does PR comment work?" | `tools-parameter.ts` | tools-parameter.ts (PR sections), GitHub API calls |
+| "What happens on error?" | `main.ts:catch block` | main.ts error handling, utility.ts:getBridgeExitCode() |
+| "How are products configured?" | `input-data/{product}.ts` | Polaris: input-data/polaris.ts, tools-parameter.ts |
+| "How does version detection work?" | `utility.ts` | utility.ts (version helpers), bridge-cli.ts |
+
+---
+
+## Component Inventory by Responsibility
+
+| Component | Responsibility | Key Files |
+|---|---|---|
+| **Entry / Orchestration** | Main workflow control, cleanup | `src/main.ts` |
+| **Bridge CLI Management** | Download, validate, execute Bridge CLI | `src/blackduck-security-action/bridge-cli.ts` |
+| **Input Handling** | Read GitHub Action inputs | `src/blackduck-security-action/inputs.ts` |
+| **Validation** | Product-specific input validation | `src/blackduck-security-action/validators.ts` |
+| **Command Building** | Generate Bridge CLI commands & JSON configs | `src/blackduck-security-action/tools-parameter.ts` |
+| **GitHub Integration** | SARIF upload, Code Scanning API | `src/blackduck-security-action/service/` |
+| **Service Factory** | Runtime selection (Cloud vs Enterprise) | `src/blackduck-security-action/factory/` |
+| **Data Models** | TypeScript interfaces per product | `src/blackduck-security-action/input-data/` |
+| **Utilities** | Helper functions, version checks | `src/blackduck-security-action/utility.ts` |
+| **Constants** | All string constants, exit codes | `src/application-constants.ts` |
+
+---
+
+## Comprehensive Analysis
+
+This skill performs a complete analysis covering all aspects of the codebase:
+1. Architecture Overview
+2. Execution Flow
+3. Data Flow
+4. Design Patterns
+5. Key Architectural Decisions
+
+---
+
+## Section 1: Architecture Analysis
+
+### Read Before Answering
+
+Before explaining any code area, **always read the relevant source files**. Do not rely on CLAUDE.md or this skill document alone for line-level details.
+
+**Key checks per area:**
+
+- **Entry flow** (`main.ts`): Order of operations, error handling in try-catch-finally, cleanup logic
+- **Bridge CLI** (`bridge-cli.ts`): Platform detection, air-gap mode branch, version compatibility checks
+- **Input handling** (`inputs.ts`): Deprecated parameter fallback chain, constants usage
+- **Command building** (`tools-parameter.ts`): JSON structure generation, file writing, CLI argument assembly
+- **Validation** (`validators.ts`): Error accumulation pattern (string[]), required field checks
+- **Version compatibility** (`utility.ts`): Version comparison helpers, SARIF path resolution logic
 
 ### Step 1 — High-Level Architecture Overview
 
@@ -212,7 +262,7 @@ Artifact Upload (artifacts.ts)
 
 ---
 
-## Mode 2: Flow Analysis
+## Section 2: Execution Flow Analysis
 
 ### Main Execution Flow
 
@@ -421,188 +471,77 @@ isRetryable(error)? → Check HTTP status code
 
 ---
 
-## Mode 3: Pattern Analysis
-
-### Patterns in Use
-
-#### Factory Pattern ⭐
-- **File**: `factory/github-client-service-factory.ts`
-- **Lines**: 11-67
-- **Type**: Static Factory Method
-- **Creates**: IGithubClientService implementations
-- **Usage**: `main.ts:92` - Runtime service selection based on GitHub URL
-- **Benefits**: Abstraction, extensibility, centralized version detection
-
-#### Builder Pattern (Implicit) 🔨
-- **File**: `tools-parameter.ts`
-- **Type**: Command Builder
-- **Builds**: Bridge CLI commands with JSON input files
-- **Methods**: `getFormattedCommandForPolaris()`, etc.
-- **Process**: Parse → Validate → Build JSON → Write file → Return args
-- **Opportunity**: Could refactor to fluent builder for better composition
-
-#### Strategy Pattern 🎯
-- **File**: `service/impl/` directory
-- **Interface**: IGithubClientService
-- **Implementations**:
-  - `GithubClientServiceCloud` - GitHub.com SARIF upload
-  - `GithubClientServiceV1` - Enterprise Server v1 upload
-- **Selection**: Factory pattern chooses strategy at runtime
-- **Benefits**: Swappable, testable, follows Open/Closed principle
-
-#### Template Method Pattern 📋
-- **File**: `service/impl/github-client-service-base.ts`
-- **Type**: Abstract base class with template methods
-- **Template**: `uploadWithRetry()` - Retry logic wrapper
-- **Customization**: Subclasses implement specific upload logic
-- **Benefits**: DRY, consistent error handling and retry behavior
-
-#### Adapter Pattern 🔌
-- **File**: `artifacts.ts`
-- **Type**: API version adapter
-- **Adapts**: @actions/artifact v1 and v2 APIs
-- **Implementation**: Conditional logic based on available API
-- **Benefits**: Backward compatibility across GitHub Actions versions
-
-### Pattern Opportunities
-
-#### 1. Fluent Builder for Commands
-**Current**: `tools-parameter.ts` methods with nested conditionals (990+ lines)
-**Problem**: Hard to test, complex conditional logic, poor readability
-**Proposed**:
-```typescript
-new BridgeCommandBuilder()
-  .forPolaris()
-    .withServerUrl(url)
-    .withAccessToken(token)
-    .withAssessmentTypes(['SAST', 'SCA'])
-    .enablePRComments()
-  .forBlackDuck()
-    .withUrl(url)
-    .withApiToken(token)
-  .build()
-```
-**Benefits**: Better composition, testability, readability
-
-#### 2. Validation Strategy Pattern
-**Current**: Product-specific validation functions in `validators.ts`
-**Problem**: Code duplication, hard to add new products
-**Proposed**:
-```typescript
-interface ValidationStrategy {
-  validate(inputs: Map<string, string>): string[]
-}
-class PolarisValidationStrategy implements ValidationStrategy {...}
-class CoverityValidationStrategy implements ValidationStrategy {...}
-```
-**Benefits**: Easier to add products, better testability
-
-#### 3. Command Pattern for Execution
-**Current**: Direct command building and execution
-**Problem**: Difficult to log, test, or undo operations
-**Proposed**:
-```typescript
-interface BridgeCommand {
-  execute(): Promise<number>
-  undo(): Promise<void>
-}
-class PolarisScanCommand implements BridgeCommand {...}
-```
-**Benefits**: Better logging, undo capability, command queueing
-
-### Anti-Patterns Detected
-
-#### 1. God Object
-- **Location**: `tools-parameter.ts` (990+ lines)
-- **Issue**: Single class handles all product command building
-- **Impact**: Hard to test, maintain, extend
-- **Recommendation**: Extract product-specific builders:
-  - `PolarisCommandBuilder`
-  - `CoverityCommandBuilder`
-  - `BlackDuckCommandBuilder`
-  - `SRMCommandBuilder`
-
-#### 2. Large Class / Utility Bag
-- **Location**: `utility.ts` (350+ lines, 35+ functions)
-- **Issue**: Lacks cohesion, mixed responsibilities (paths, versions, SARIF, SSO)
-- **Impact**: Unclear purpose, difficult to navigate
-- **Recommendation**: Split into focused modules:
-  - `path-utils.ts` - Path manipulation
-  - `version-utils.ts` - Version comparison
-  - `sarif-utils.ts` - SARIF path updates
-  - `sso-utils.ts` - SSO URL handling
-
----
-
-## Mode 4: Comprehensive Analysis
-
-When user asks general "explain how this works" questions, provide all three modes:
-
-1. **Architecture Overview** (from Mode 1)
-   - High-level components and their responsibilities
-   - Module organization
-
-2. **Execution Flow** (from Mode 2)
-   - Step-by-step trace from entry to exit
-   - Data transformations at each layer
-
-3. **Pattern Summary** (from Mode 3)
-   - Key patterns used and why
-   - Architectural decisions and trade-offs
-
----
-
 ## Output Format
 
+Provide the analysis as a structured markdown document:
+
 ```markdown
-# Code Explanation: [Topic]
+# Code Explanation: Black Duck Security Scan
 
-## Architecture
+## Executive Summary
+[2-3 sentence overview of the architecture]
 
-[Component diagram or description]
+## High-Level Architecture
+[Component diagram or description of major components and their relationships]
 
-### Key Components
-- **Component Name** (`file.ts:lines`): [Purpose]
+## Component Breakdown
 
-## Execution Flow
+### [Component Name]
+- **Location**: `src/path/to/file.ts`
+- **Purpose**: [What it does]
+- **Key Methods**:
+  - `methodName()` (line X): [Description]
+- **Dependencies**: [What it uses]
+- **Used By**: [Who uses it]
 
-[Step-by-step trace with file:line references]
+[Repeat for each major component]
 
 ## Design Patterns
 
-### Pattern Name
-- **Location**: `file.ts:lines`
-- **Purpose**: [Why used]
-- **Benefits**: [What it provides]
+### [Pattern Name]
+- **Where**: `file.ts:line`
+- **Why**: [Justification]
+- **Example**: [Code snippet or reference]
 
-## Key Takeaways
+## Execution Flow
 
-- [Important architectural decisions]
-- [How to extend or modify]
+1. Input Collection → Validation → Transformation → Execution → Output
+2. [Detailed flow with file:line references]
+
+## Data Flow
+
+[How data transforms through the system with file:line references]
+
+## Key Architectural Decisions
+
+### [Decision Name]
+- **Decision**: [What was chosen]
+- **Rationale**: [Why]
+- **Trade-offs**: [Pros/cons]
+- **Implementation**: [Where in code]
+
+## Extension Points
+
+[How to extend the architecture for new features]
 ```
 
 ## Best Practices
 
-- **Use file:line references**: Always include exact locations
-- **Show relationships**: Explain how components interact
-- **Explain WHY**: Not just what code does, but why it's structured that way
-- **Include trade-offs**: Discuss pros/cons of architectural decisions
-- **Visual aids**: Use diagrams, flow charts, decision trees
-- **Real examples**: Reference actual usage from the codebase
+- **Use file:line references**: Always include `file.ts:line` for code references
+- **Show relationships**: Explain how components interact, not just what they do
+- **Identify patterns**: Call out design patterns explicitly
+- **Explain trade-offs**: Discuss why architectural choices were made
+- **Keep it visual**: Use diagrams or structured formats where helpful
+- **Focus on flow**: Show how data/control flows through the system
 
-## Example Questions Handled
+## Example Analysis
 
-**Q: "How does this codebase work?"**
-→ Provide Mode 4 (Comprehensive Analysis)
+**For Question**: "How does this codebase work?"
 
-**Q: "Explain the architecture"**
-→ Provide Mode 1 (Architecture Analysis)
-
-**Q: "What happens when I run a Polaris scan?"**
-→ Provide Mode 2 (Flow Analysis) with Polaris-specific trace
-
-**Q: "What design patterns are used?"**
-→ Provide Mode 3 (Pattern Analysis)
-
-**Q: "How does SARIF upload work?"**
-→ Combination of Flow + Pattern (Factory + Strategy patterns, upload flow)
+**Provide**:
+1. Architecture overview with all core components
+2. Complete execution flow from entry to exit
+3. Data transformation at each layer
+4. Design patterns used and why
+5. Key architectural decisions and trade-offs
+6. How to extend for new features

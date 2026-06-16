@@ -5,7 +5,7 @@ description: Comprehensive security review skill that analyzes code for security
 
 # Security Review
 
-Performs comprehensive security analysis of the Black Duck Security Scan codebase, identifying vulnerabilities and ensuring security best practices are followed.
+Performs comprehensive security analysis of the Black Duck Security Scan codebase, identifying vulnerabilities and ensuring security best practices are followed. Always read changed files before producing findings. Never flag theoretical risks when the code pattern already mitigates them.
 
 ## Usage
 
@@ -14,695 +14,393 @@ Run this skill when the user requests:
 - "Check for security vulnerabilities"
 - "Perform security audit"
 - "Security scan"
+- "SAST review"
 - "Check for security issues"
 - "OWASP Top 10 review"
-- "Find security vulnerabilities"
 
-## Security Review Areas
+## How to Use
 
-This skill covers 10 key security areas:
+When conducting a security review:
 
-1. **Input Validation** - All user inputs properly validated
-2. **Injection Prevention** - Command, SQL, and path injection prevention
-3. **Unsafe Operations** - Avoiding eval, innerHTML, and dangerous functions
-4. **Secret Handling** - Proper management of credentials and tokens
-5. **Data Sanitization** - Cleaning and validating external data
-6. **Authentication & Authorization** - Secure token and credential management
-7. **Network Security** - HTTPS, SSL/TLS, and proxy configuration
-8. **File System Security** - Path traversal and temp file handling
-9. **Dependency Security** - Third-party library vulnerabilities
-10. **Logging & Monitoring** - Secure logging without exposing secrets
+1. **Read all changed files** (or files specified by user)
+2. **Run each checklist** section below against the code
+3. **Report findings** as: `file:line — [SEVERITY] — vulnerability — remediation`
+4. **Use severity tags**: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
 
 ---
 
-## Area 1: Input Validation
+## Severity Reference
 
-### What to Check
-
-**All User Inputs Must Be Validated**:
-- Type checking for external data
-- Range and length validation
-- Regex validation for patterns
-- Null/undefined handling
-
-### Good Patterns
-
-**From validators.ts**:
-```typescript
-/**
- * Validates inputs and returns array of errors
- */
-export function validateInputs(): string[] {
-  const errors: string[] = []
-
-  // Validate required fields
-  if (!inputs.SERVER_URL) {
-    errors.push('Server URL is required')
-  }
-
-  // Validate format/pattern
-  if (inputs.SERVER_URL && !isValidUrl(inputs.SERVER_URL)) {
-    errors.push('Server URL must be a valid HTTPS URL')
-  }
-
-  return errors
-}
-```
-
-### Bad Patterns
-
-```typescript
-// ❌ DANGEROUS: No validation
-function process(userInput: string) {
-  return exec(`command ${userInput}`)
-}
-
-// ❌ DANGEROUS: Missing null check
-function process(input: string | null) {
-  return input.toUpperCase() // Error if null
-}
-
-// ❌ DANGEROUS: Direct use without validation
-const command = process.env.USER_COMMAND
-exec(command)
-```
-
-### Search For
-
-```bash
-# Find unvalidated inputs
-grep -rn "core.getInput" src/ | grep -v "validate"
-grep -rn "process.env" src/ | grep -v "GITHUB_"
-```
-
-### Report Items
-
-```markdown
-### Input Validation Issues
-
-**Issue**: Unvalidated user input
-- **File**: `file.ts:line`
-- **Risk**: HIGH - Injection or malformed data
-- **Problem**: User input used without validation
-- **Fix**: Add validation function before use
-```
+| Tag | Meaning | Examples |
+|---|---|---|
+| `CRITICAL` | Direct credential exfiltration or code execution possible | Hardcoded secrets, command injection, eval() on user input |
+| `HIGH` | Credential leak to logs/files, injection vulnerability, TLS bypass | Secrets in logs, path traversal, SQL injection, rejectUnauthorized: false |
+| `MEDIUM` | Conditional exposure, information disclosure | Error messages with sensitive data, missing input validation |
+| `LOW` | Defense-in-depth hardening, not exploitable alone | Missing rate limiting, weak cipher suites |
 
 ---
 
-## Area 2: Injection Prevention
+## Checklist 1 — Secret and Credential Logging
 
-### Command Injection
+**Context:** Credentials flow through `inputs.ts` exports (`POLARIS_ACCESS_TOKEN`, `BLACKDUCKSCA_API_TOKEN`, `COVERITY_USER`, `COVERITY_PASSPHRASE`, `GITHUB_TOKEN`). These are written into JSON input files and passed to Bridge CLI.
 
-**Safe Pattern**:
+**Checks:**
+- [ ] No credential input from `inputs.ts` passed to `core.info()`, `core.debug()`, `core.warning()`, or `core.error()`
+- [ ] No secret value interpolated into template literals that feed any log call, e.g. `` `token: ${inputs.POLARIS_ACCESS_TOKEN}` ``
+- [ ] No `JSON.stringify(fullInputData)` passed to any log function — contains tokens/passwords
+- [ ] File paths logged, never their contents when they contain secrets
+- [ ] `core.setSecret()` called for all credential values to mask them in logs
+- [ ] Error objects from HTTP calls do not propagate response bodies containing auth headers to logs
+- [ ] No secrets in `core.setOutput()` or `core.exportVariable()` calls
+- [ ] GitHub Actions annotations (`::error::`, `::warning::`) do not contain secrets
+
+**Remediation pattern:**
 ```typescript
-// ✅ SAFE: Parameterized execution
-import * as exec from '@actions/exec'
+// ❌ WRONG — logs credential
+core.info(`Using token: ${POLARIS_ACCESS_TOKEN}`)
+console.log(`Config: ${JSON.stringify(polarisData)}`)
 
-await exec.exec('bridge-cli', [
-  '--stage', 'polaris',
-  '--input', inputFilePath
-])
-```
-
-**Dangerous Pattern**:
-```typescript
-// ❌ DANGEROUS: String concatenation
-exec(`bridge-cli --stage ${userInput}`)
-exec(`command ${param1} ${param2}`)
-```
-
-### Path Traversal
-
-**Safe Pattern**:
-```typescript
-// ✅ SAFE: Path validation
-import * as path from 'path'
-
-const basePath = '/safe/directory'
-const userPath = path.normalize(userInput)
-const fullPath = path.join(basePath, userPath)
-
-// Validate path stays within base directory
-if (!fullPath.startsWith(basePath)) {
-  throw new Error('Invalid path: directory traversal detected')
-}
-
-fs.readFile(fullPath)
-```
-
-**Dangerous Pattern**:
-```typescript
-// ❌ DANGEROUS: Direct user path
-fs.readFile(userProvidedPath)
-
-// ❌ DANGEROUS: String concatenation
-fs.readFile(`/base/path/${userInput}`)
-```
-
-### SQL Injection (if applicable)
-
-**Safe Pattern**:
-```typescript
-// ✅ SAFE: Parameterized query
-db.query('SELECT * FROM users WHERE id = ?', [userId])
-```
-
-**Dangerous Pattern**:
-```typescript
-// ❌ DANGEROUS: String concatenation
-db.query(`SELECT * FROM users WHERE id = ${userId}`)
-```
-
-### Search Patterns
-
-```bash
-# Find potential command injection
-grep -rn "exec(\`" src/
-grep -rn 'exec("' src/
-grep -rn "spawn(\`" src/
-
-# Find potential path traversal
-grep -rn "fs.readFile" src/ | grep -v "path.join"
-grep -rn "fs.writeFile" src/ | grep -v "path.join"
-
-# Find SQL concatenation (if applicable)
-grep -rn "query(\`" src/
-grep -rn "query(\"" src/ | grep -v "?"
-```
-
----
-
-## Area 3: Unsafe Operations
-
-### Never Use These
-
-**Extremely Dangerous**:
-```typescript
-// ❌ NEVER USE
-eval(userInput)
-new Function(userInput)()
-vm.runInNewContext(userInput)
-```
-
-**Avoid in Production**:
-```typescript
-// ⚠️ AVOID
-element.innerHTML = userContent
-dangerouslySetInnerHTML={{__html: userContent}}
-document.write(userContent)
-```
-
-### Search Patterns
-
-```bash
-# Find eval usage
-grep -rn "eval(" src/
-
-# Find Function constructor
-grep -rn "new Function" src/
-
-# Find innerHTML
-grep -rn "innerHTML" src/
-
-# Find dangerous HTML injection
-grep -rn "dangerouslySetInnerHTML" src/
-grep -rn "document.write" src/
-```
-
-### Report Items
-
-```markdown
-### Unsafe Operations Found
-
-**Issue**: Use of eval() detected
-- **File**: `file.ts:line`
-- **Risk**: CRITICAL - Arbitrary code execution
-- **Problem**: eval() allows execution of arbitrary code
-- **Fix**: Remove eval() and use safe alternatives
-```
-
----
-
-## Area 4: Secret Handling
-
-### Good Patterns
-
-**Use GitHub Secrets** (inputs.ts):
-```typescript
-// ✅ SAFE: Secrets from environment
-export const POLARIS_ACCESS_TOKEN = core.getInput(
-  constants.POLARIS_ACCESS_TOKEN_KEY
-)
-
-// Token automatically masked by GitHub Actions
+// ✅ CORRECT — mask secret first, log without sensitive data
 core.setSecret(POLARIS_ACCESS_TOKEN)
+core.info(`Connecting to server: ${POLARIS_SERVER_URL}`)
+core.info(`Generated input file at: ${inputFilePath}`)
 ```
 
-**Never Log Secrets**:
-```typescript
-// ✅ SAFE: Log without exposing token
-info(`Connecting to ${serverUrl}`)
-
-// ❌ DANGEROUS: Token in logs
-info(`Using token ${accessToken}`)
-```
-
-### Bad Patterns to Find
-
-```typescript
-// ❌ NEVER: Hardcoded credentials
-const apiKey = 'sk_live_abc123...'
-const password = 'admin123'
-const token = 'ghp_abc123...'
-
-// ❌ NEVER: Secrets in error messages
-throw new Error(`Authentication failed with token ${token}`)
-
-// ❌ NEVER: Secrets in version control
-const config = {
-  apiKey: 'secret-key-123'
-}
-```
-
-### Search Patterns
-
-```bash
-# Find potential hardcoded secrets
-grep -r "password\s*=\s*['\"]" src/
-grep -r "api[-_]key\s*=\s*['\"]" src/
-grep -r "secret\s*=\s*['\"]" src/
-grep -r "token\s*=\s*['\"]" src/
-grep -r "apiKey\s*:\s*['\"]" src/
-
-# Find secrets in logs
-grep -rn "info.*TOKEN" src/
-grep -rn "debug.*PASSWORD" src/
-grep -rn "console.log.*SECRET" src/
-```
-
-### Secret Files to Check
-
-```bash
-# Files that should not contain secrets
-.env
-config.json
-credentials.json
-secrets.json
-.npmrc (with tokens)
-```
-
-### Report Items
-
-```markdown
-### Secret Handling Issues
-
-**Issue**: Hardcoded API key found
-- **File**: `file.ts:line`
-- **Risk**: CRITICAL - Credential exposure
-- **Problem**: API key hardcoded in source code
-- **Fix**: Move to GitHub Secrets, use core.getInput()
-```
+**CRITICAL risk:** Credentials in logs are visible to anyone with Actions read access and persist in log storage.
 
 ---
 
-## Area 5: Data Sanitization
+## Checklist 2 — Credential Exposure in Temporary Files
 
-### File Path Sanitization
+**Context:** `tools-parameter.ts` writes full product config (including access tokens) to temp files: `polaris_input.json`, `bd_input.json`, etc. These live in `os.tmpdir()` during action execution.
 
+**Checks:**
+- [ ] Temp files written to `os.tmpdir()` — NOT to workspace or hardcoded path
+- [ ] Temp files not written to any path derived from user input (path traversal risk)
+- [ ] Temp directory cleanup verified — `main.ts` finally block must `rmRF` the temp dir
+- [ ] Temp files not uploaded as artifacts (no `@actions/artifact` upload of `*_input.json`)
+- [ ] Diagnostics artifact upload does NOT include `*_input.json` files
+- [ ] No `fs.writeFileSync()` with world-readable permissions (`0o644`) for secret-containing files
+- [ ] File permissions on temp files are restrictive (0o600 owner-only if possible)
+
+**Remediation pattern:**
 ```typescript
-// ✅ SAFE: Normalize and validate
-function sanitizePath(userPath: string, baseDir: string): string {
-  // Normalize path (remove .., ./, etc.)
-  const normalized = path.normalize(userPath)
+// ❌ WRONG — hardcoded path
+const inputFile = '/tmp/polaris_input.json'
 
-  // Remove leading path traversal attempts
-  const safe = normalized.replace(/^(\.\.(\/|\\|$))+/, '')
+// ❌ WRONG — workspace path (persists after run)
+const inputFile = path.join(process.cwd(), 'polaris_input.json')
 
-  // Join with base directory
-  const fullPath = path.join(baseDir, safe)
-
-  // Validate result is within base directory
-  if (!fullPath.startsWith(baseDir)) {
-    throw new Error('Path traversal attempt detected')
-  }
-
-  return fullPath
-}
-```
-
-### URL Validation
-
-```typescript
-// ✅ SAFE: Validate URL
-function isValidUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url)
-    // Enforce HTTPS
-    return parsed.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
-// Use it
-if (!isValidUrl(userUrl)) {
-  throw new Error('Invalid URL')
-}
-```
-
-### File Name Sanitization
-
-```typescript
-// ✅ SAFE: Sanitize file name
-function sanitizeFileName(fileName: string): string {
-  return fileName
-    .replace(/[^a-zA-Z0-9.-]/g, '_') // Only allow safe chars
-    .replace(/\.{2,}/g, '.') // Prevent multiple dots
-    .slice(0, 255) // Limit length
-}
-```
-
-### Report Items
-
-```markdown
-### Data Sanitization Issues
-
-**Issue**: URL not validated
-- **File**: `file.ts:line`
-- **Risk**: MEDIUM - Malicious URL usage
-- **Problem**: User-provided URL used without validation
-- **Fix**: Validate URL format and protocol (HTTPS only)
-```
-
----
-
-## Area 6: Authentication & Authorization
-
-### Token Storage
-
-**Safe Patterns**:
-```typescript
-// ✅ SAFE: Token from environment
-const token = core.getInput('github_token')
-core.setSecret(token)
-
-// ✅ SAFE: Token in memory only
-const octokit = github.getOctokit(token)
-```
-
-**Dangerous Patterns**:
-```typescript
-// ❌ DANGEROUS: Token in localStorage
-localStorage.setItem('token', token)
-
-// ❌ DANGEROUS: Token in URL
-fetch(`/api?token=${token}`)
-
-// ❌ DANGEROUS: Token in logs
-console.log(`Using token: ${token}`)
-```
-
-### Token Transmission
-
-**Requirements**:
-- Always use HTTPS for token transmission
-- Use Authorization header, not query params
-- Never log tokens
-- Mask tokens in GitHub Actions with `core.setSecret()`
-
-### Report Items
-
-```markdown
-### Authentication Issues
-
-**Issue**: Token in query parameter
-- **File**: `file.ts:line`
-- **Risk**: HIGH - Token exposure in logs/URLs
-- **Problem**: Token passed in URL query parameter
-- **Fix**: Use Authorization header instead
-```
-
----
-
-## Area 7: Network Security
-
-### HTTPS Enforcement
-
-**Safe Pattern**:
-```typescript
-// ✅ SAFE: Validate HTTPS
-function validateServerUrl(url: string): boolean {
-  const parsed = new URL(url)
-  if (parsed.protocol !== 'https:') {
-    throw new Error('Server URL must use HTTPS')
-  }
-  return true
-}
-```
-
-### SSL/TLS Configuration
-
-**From ssl-utils.ts**:
-```typescript
-// ✅ SAFE: SSL verification enabled by default
-export function configureSsl() {
-  // Only disable SSL verification in air-gap mode
-  if (inputs.NETWORK_AIRGAP === 'true') {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-  } else {
-    // Use proper SSL verification
-    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-  }
-}
-```
-
-### Proxy Configuration
-
-**Safe Pattern**:
-```typescript
-// ✅ SAFE: Proxy from environment
-const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy
-const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy
-```
-
-### Report Items
-
-```markdown
-### Network Security Issues
-
-**Issue**: SSL verification globally disabled
-- **File**: `file.ts:line`
-- **Risk**: HIGH - Man-in-the-middle attacks
-- **Problem**: NODE_TLS_REJECT_UNAUTHORIZED disabled unconditionally
-- **Fix**: Only disable in specific air-gap scenarios
-```
-
----
-
-## Area 8: File System Security
-
-### Temp File Cleanup
-
-**Good Pattern** (main.ts):
-```typescript
-let tempDir: string
-
+// ✅ CORRECT — OS temp directory with cleanup
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'action_temp_'))
+const inputFile = path.join(tempDir, 'polaris_input.json')
 try {
-  // Create temp directory
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'action_temp_'))
-
-  // Use temp directory for operations
-  await performOperations(tempDir)
+  // Use file
 } finally {
-  // Always cleanup, even if error
-  if (tempDir && fs.existsSync(tempDir)) {
-    fs.rmSync(tempDir, {recursive: true, force: true})
-  }
+  fs.rmSync(tempDir, { recursive: true, force: true })
 }
 ```
 
-### File Permissions
+**HIGH risk:** If temp files persist or are in accessible locations, other processes/users can read credentials.
 
+---
+
+## Checklist 3 — Command Injection
+
+**Context:** `@actions/exec` is used to execute Bridge CLI. The command is built by concatenating `--stage` and `--input` flags in `tools-parameter.ts`.
+
+**Checks:**
+- [ ] Bridge CLI executable path resolved via `path.join()` from validated base — NOT from raw user input
+- [ ] No user-supplied string injected directly into command without sanitization
+- [ ] Product URLs, tokens, paths go into JSON input files — NOT into command arguments
+- [ ] File paths in command arguments are properly quoted if needed
+- [ ] No `eval()`, `new Function()`, `child_process.execSync()`, or `child_process.spawn()` with `shell: true`
+- [ ] Bridge CLI executable path validated with `fs.existsSync()` before execution
+- [ ] `BRIDGECLI_INSTALL_DIRECTORY` path traversal check — resolved path stays within expected bounds
+- [ ] Working directory for exec is validated (uses `process.env.GITHUB_WORKSPACE`)
+
+**Remediation pattern:**
 ```typescript
-// ✅ SAFE: Restrictive permissions
-fs.writeFileSync(secretFile, data, {mode: 0o600}) // Owner only
+// ❌ WRONG — string concatenation (shell injection risk)
+exec(`bridge-cli --stage ${userInput}`)
 
-// ❌ DANGEROUS: World-readable secrets
-fs.writeFileSync(secretFile, data, {mode: 0o644})
+// ✅ CORRECT — array args (no shell parsing)
+await exec.exec('bridge-cli', ['--stage', 'polaris', '--input', inputPath])
 ```
 
-### Directory Traversal Prevention
+**CRITICAL risk:** Shell injection allows arbitrary command execution on the runner.
 
+---
+
+## Checklist 4 — Path Traversal
+
+**Context:** File paths are constructed in `utility.ts`, `tools-parameter.ts`, and user-controlled inputs include `BRIDGECLI_INSTALL_DIRECTORY`, temp file paths, SARIF file paths.
+
+**Checks:**
+- [ ] User-supplied path inputs passed through `path.resolve()` or `path.normalize()` before use
+- [ ] Resolved path verified to stay within expected base (workspace or temp dir)
+- [ ] Check for `..` traversal escaping the allowed tree
+- [ ] SARIF file paths (user-overridable) resolved relative to workspace — not treated as absolute blindly
+- [ ] No `__dirname` or relative path used as base for security-critical operations
+- [ ] Path validation before `fs.readFileSync()`, `fs.writeFileSync()`, `fs.existsSync()`
+- [ ] No file operations on paths containing `..` without normalization
+
+**Remediation pattern:**
 ```typescript
-// ✅ SAFE: Validate paths
-const safePath = path.join(baseDir, path.normalize(userPath))
-if (!safePath.startsWith(baseDir)) {
+// ❌ WRONG — no validation
+fs.readFile(userPath)
+
+// ✅ CORRECT — validate within allowed base
+const basePath = path.resolve(process.env.GITHUB_WORKSPACE)
+const userPath = path.resolve(inputs.CUSTOM_PATH)
+const normalizedPath = path.normalize(userPath)
+
+if (!normalizedPath.startsWith(basePath + path.sep) && normalizedPath !== basePath) {
   throw new Error('Path traversal detected')
 }
+fs.readFileSync(normalizedPath)
 ```
 
-### Report Items
-
-```markdown
-### File System Security Issues
-
-**Issue**: Missing temp file cleanup
-- **File**: `file.ts:line`
-- **Risk**: MEDIUM - Temp file leakage
-- **Problem**: Temp files not cleaned up in error path
-- **Fix**: Use finally block for cleanup
-```
+**HIGH risk:** Path traversal can read/write arbitrary files on the runner, including secrets from other jobs.
 
 ---
 
-## Area 9: Dependency Security
+## Checklist 5 — TLS / SSL Security
 
-### Check for Vulnerabilities
+**Context:** `ssl-utils.ts` handles custom CA certificates. Network operations use `https` module and axios.
 
+**Checks:**
+- [ ] No `rejectUnauthorized: false` without explicit user opt-in
+- [ ] `NODE_TLS_REJECT_UNAUTHORIZED=0` never set in codebase
+- [ ] Custom CA certificates appended to system CAs — not replacing them
+- [ ] No SSL verification disabled by default
+- [ ] All HTTPS requests use Node's default secure settings unless explicitly overridden
+- [ ] Proxy configuration doesn't bypass TLS verification
+- [ ] Certificate validation errors are not silently caught and ignored
+
+**Remediation pattern:**
+```typescript
+// ❌ WRONG — TLS bypass
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+const agent = new https.Agent({ rejectUnauthorized: false })
+
+// ✅ CORRECT — secure defaults
+// Use Node's default https behavior
+// Only customize if user explicitly provides CA cert
+```
+
+**HIGH risk:** TLS bypass enables man-in-the-middle attacks.
+
+---
+
+## Checklist 6 — Token Handling and Authorization
+
+**Context:** `GITHUB_TOKEN` is used for GitHub API operations. Other tokens passed to Bridge CLI.
+
+**Checks:**
+- [ ] `Authorization` headers only sent over HTTPS endpoints
+- [ ] Tokens not logged at any level — even base64 encoded
+- [ ] Tokens consumed from GitHub Secrets via `core.getInput()` — NOT hardcoded or from env directly
+- [ ] No token value in error messages
+- [ ] `core.setSecret()` called for all tokens before any operations
+- [ ] Authorization headers not forwarded to non-GitHub endpoints
+- [ ] Tokens not written to files outside temp directory
+- [ ] No tokens in workflow command outputs (`::set-output::`)
+
+**Remediation pattern:**
+```typescript
+// ❌ WRONG — token in logs
+const token = core.getInput('github_token')
+core.info(`Using token: ${token}`)
+
+// ✅ CORRECT — mask first
+const token = core.getInput('github_token')
+core.setSecret(token)
+core.info('GitHub token configured')
+```
+
+**HIGH risk:** Exposed tokens allow unauthorized API access and repository operations.
+
+---
+
+## Checklist 7 — Input Injection into JSON Payloads
+
+**Context:** User inputs (URLs, project names, assessment types) are serialized into `*_input.json` via `JSON.stringify()`.
+
+**Checks:**
+- [ ] All user inputs placed into typed model objects before `JSON.stringify()`
+- [ ] Typed assignment prevents extra key injection
+- [ ] Assessment type values validated against allowed list before use
+- [ ] No user input concatenated directly into JSON strings (manual `"{"key": " + userVal + "}"`)
+- [ ] Severity values validated against allowed list
+- [ ] Branch names, project names from environment treated as untrusted
+- [ ] No prototype pollution risk — objects created with `Object.create(null)` if needed
+
+**Remediation pattern:**
+```typescript
+// ❌ WRONG — string concatenation
+const json = `{"token": "${userToken}"}`
+
+// ✅ CORRECT — typed object + JSON.stringify
+const data: PolarisData = {
+  accesstoken: userToken,
+  serverUrl: userUrl
+}
+const json = JSON.stringify({ data: { polaris: data } })
+```
+
+**MEDIUM risk:** JSON injection can alter structure or inject unexpected fields.
+
+---
+
+## Checklist 8 — GitHub Actions Environment Security
+
+**Context:** GitHub Actions exposes environment variables and allows setting outputs/variables.
+
+**Checks:**
+- [ ] Only non-sensitive data in `core.setOutput()` — exit codes/status strings are safe
+- [ ] No `core.setOutput()` with secret-derived values
+- [ ] No `core.exportVariable()` with secrets
+- [ ] `core.setFailed()` message doesn't include credentials — only error codes
+- [ ] Environment variables containing secrets treated as untrusted
+- [ ] No secrets in artifact names or paths
+- [ ] Action outputs documented as non-secret in action.yml
+
+**Remediation pattern:**
+```typescript
+// ❌ WRONG — secret in output
+core.setOutput('polaris_token', accessToken)
+
+// ✅ CORRECT — only non-sensitive data
+core.setOutput('scan_status', exitCode === 0 ? 'success' : 'failure')
+```
+
+**HIGH risk:** Outputs are visible in workflow logs and to downstream jobs.
+
+---
+
+## Checklist 9 — Dependency and Supply Chain Security
+
+**Checks:**
+- [ ] Dependencies use exact versions in `package.json` — not `^` or `~` ranges for security-critical deps
+- [ ] `package-lock.json` committed and up to date
+- [ ] `npm audit` shows no high/critical vulnerabilities
+- [ ] No dependencies with known CVEs
+- [ ] `dist/` directory rebuilt after dependency changes (`npm run package`)
+- [ ] No eval-capable packages for untrusted input processing
+- [ ] Build artifacts don't bundle `.env` files or private keys
+- [ ] Dependencies regularly updated for security patches
+
+**Remediation pattern:**
 ```bash
-# Check for known vulnerabilities
+# Check for vulnerabilities
 npm audit
 
-# Show detailed vulnerability report
-npm audit --json
-
-# Auto-fix vulnerabilities
+# Fix auto-fixable issues
 npm audit fix
 
-# Check for outdated packages
-npm outdated
+# Update package-lock.json
+npm install
 
-# Check specific package
-npm audit --package=<package-name>
+# Rebuild distribution
+npm run package
 ```
 
-### Review Dependencies
-
-**Check**:
-- Are all dependencies necessary?
-- Are versions up to date?
-- Are there known vulnerabilities?
-- Are dependencies from trusted sources?
-
-### Report Items
-
-```markdown
-### Dependency Security Issues
-
-**Summary**:
-- Critical vulnerabilities: [count]
-- High vulnerabilities: [count]
-- Medium vulnerabilities: [count]
-- Low vulnerabilities: [count]
-
-**Critical Issues**:
-1. [@package/name](version): [vulnerability description]
-   - **Risk**: [Impact]
-   - **Fix**: Update to version [X.Y.Z]
-```
+**CRITICAL risk:** Vulnerable dependencies can be exploited if they process untrusted input.
 
 ---
 
-## Area 10: Logging & Monitoring
+## Checklist 10 — Error Message Information Disclosure
 
-### Secure Logging
+**Context:** Error messages from `validators.ts`, `bridge-cli.ts`, `tools-parameter.ts` appear in GitHub Actions logs visible to repository members.
 
-**Safe Patterns**:
+**Checks:**
+- [ ] Error messages reference parameter names — NOT actual input values
+- [ ] HTTP error responses don't include response body if it could contain stack traces
+- [ ] File not found errors reference parameter name — not resolved file path
+- [ ] No `JSON.stringify(error)` that might include request headers with tokens
+- [ ] Version file parse errors don't expose full file content
+- [ ] Stack traces sanitized to remove sensitive paths if logged
+
+**Remediation pattern:**
 ```typescript
-// ✅ SAFE: Log without secrets
-import {info, warning, error} from '@actions/core'
+// ❌ WRONG — exposes value
+throw new Error(`Invalid token: ${token}`)
 
-info('Starting Bridge CLI execution')
-info(`Scanning with products: ${productList}`)
-
-// Secrets automatically masked if registered with core.setSecret()
-core.setSecret(accessToken)
-info(`Token: ${accessToken}`) // Will show as ***
+// ✅ CORRECT — references param name only
+throw new Error('polaris_access_token is required but not provided')
 ```
 
-**Dangerous Patterns**:
-```typescript
-// ❌ DANGEROUS: Secrets in logs
-console.log(`Access token: ${accessToken}`)
-console.log(`Password: ${password}`)
-
-// ❌ DANGEROUS: Sensitive data in error messages
-throw new Error(`Failed to authenticate with token ${token}`)
-
-// ❌ DANGEROUS: Full request/response bodies
-console.log(`Response: ${JSON.stringify(response)}`)
-```
-
-### Report Items
-
-```markdown
-### Logging Security Issues
-
-**Issue**: Secret exposed in log statement
-- **File**: `file.ts:line`
-- **Risk**: CRITICAL - Secret exposure in logs
-- **Problem**: Access token logged to console
-- **Fix**: Remove secret from log or use core.setSecret()
-```
+**MEDIUM risk:** Information disclosure aids attackers in reconnaissance.
 
 ---
 
-## OWASP Top 10 Checklist
+## OWASP Top 10 Compliance Checklist
 
-Run through this checklist for comprehensive security review:
+Run through this for comprehensive coverage:
 
-### 1. Injection
-- [ ] Command injection prevented (parameterized commands)
+### 1. Injection (A03:2021)
+- [ ] Command injection prevented (no shell execution with user input)
 - [ ] Path traversal prevented (path validation)
-- [ ] No string concatenation in system commands
-- [ ] SQL injection prevented (if using DB)
+- [ ] No SQL injection risk (N/A - no database)
+- [ ] JSON injection prevented (typed objects)
 
-### 2. Broken Authentication
-- [ ] Secrets from environment/GitHub Secrets
-- [ ] No hardcoded credentials
-- [ ] Tokens properly masked
-- [ ] Token expiration handled
-
-### 3. Sensitive Data Exposure
+### 2. Cryptographic Failures (A02:2021)
 - [ ] Secrets not in logs
 - [ ] Secrets not in error messages
-- [ ] SSL/TLS enforced
-- [ ] Sensitive files excluded from git
+- [ ] TLS enforced (no `rejectUnauthorized: false` by default)
+- [ ] Temp files cleaned up
 
-### 4. XML External Entities (if parsing XML)
-- [ ] XML parser configured securely
-- [ ] External entity expansion disabled
+### 3. Injection (covered above)
 
-### 5. Broken Access Control
-- [ ] File access validated
-- [ ] Path traversal prevented
-- [ ] Directory boundaries enforced
+### 4. Insecure Design (A04:2021)
+- [ ] Principle of least privilege (minimal permissions)
+- [ ] Validation on all inputs
+- [ ] Secure defaults
 
-### 6. Security Misconfiguration
-- [ ] Defaults are secure
-- [ ] Development configs not in production
+### 5. Security Misconfiguration (A05:2021)
+- [ ] No secrets in repository
+- [ ] Secure defaults for all settings
 - [ ] Error messages don't expose internals
-- [ ] Security headers set
 
-### 7. Cross-Site Scripting (if generating HTML)
-- [ ] User input sanitized
-- [ ] No innerHTML with user data
-- [ ] Content Security Policy set
-
-### 8. Insecure Deserialization
-- [ ] JSON.parse() validated
-- [ ] Type checking after parsing
-- [ ] No eval() on parsed data
-
-### 9. Using Components with Known Vulnerabilities
+### 6. Vulnerable and Outdated Components (A06:2021)
 - [ ] Dependencies up to date
 - [ ] No known vulnerable versions
-- [ ] Regular npm audit runs
+- [ ] Regular `npm audit`
 
-### 10. Insufficient Logging & Monitoring
-- [ ] Security events logged
-- [ ] Errors properly logged
+### 7. Identification and Authentication Failures (A07:2021)
+- [ ] Tokens from GitHub Secrets
+- [ ] No hardcoded credentials
+- [ ] Tokens masked with `core.setSecret()`
+
+### 8. Software and Data Integrity Failures (A08:2021)
+- [ ] Verify Bridge CLI download integrity (checksums if available)
+- [ ] No eval or unsafe deserialization
+- [ ] Type checking after JSON.parse
+
+### 9. Security Logging and Monitoring Failures (A09:2021)
+- [ ] Security events logged (auth failures, validation errors)
 - [ ] Logs don't contain secrets
+- [ ] Error handling doesn't swallow security exceptions
+
+### 10. Server-Side Request Forgery (A10:2021)
+- [ ] URLs validated before HTTP requests
+- [ ] Internal network access restricted
+- [ ] Proxy configuration validated
+
+---
+
+## Known Safe Patterns (Do Not Flag)
+
+These patterns are secure by design — do not flag as vulnerabilities:
+
+- ✅ `@actions/exec` with array args — not shell injection vulnerable
+- ✅ `path.join(tempDir, filename)` for generated JSON files — safe if tempDir from `os.tmpdir()`
+- ✅ `JSON.stringify(typedObject)` where object from typed model — not prototype pollution
+- ✅ `core.setSecret(token)` before logging — correct masking pattern
+- ✅ `fs.mkdtempSync(path.join(os.tmpdir(), prefix))` — secure temp directory
+- ✅ Reading `process.env.GITHUB_*` variables — these are GitHub-controlled
+- ✅ `@actions/core`, `@actions/exec`, `@actions/github` usage — official GitHub packages
 
 ---
 
@@ -714,31 +412,30 @@ Run through this checklist for comprehensive security review:
 # Dependency vulnerabilities
 npm audit
 
-# TypeScript compilation (finds some issues)
-npm run build
+# Check for outdated packages
+npm outdated
 
-# Linting (finds some security issues)
-npm run lint
+# Type check
+npm run build
 ```
 
 ### Step 2: Pattern-Based Search
 
 ```bash
-# Secrets
-grep -r "password.*=.*['\"]" src/
-grep -r "api[-_]key.*=.*['\"]" src/
-grep -r "secret.*=.*['\"]" src/
+# Find potential secrets
+grep -r "password\s*=\s*['\"]" src/
+grep -r "api[-_]key\s*=\s*['\"]" src/
+grep -r "token\s*=\s*['\"]" src/
 
-# Unsafe operations
+# Find unsafe operations
 grep -r "eval(" src/
 grep -r "new Function" src/
-grep -r "innerHTML" src/
 
-# Command execution
+# Find command execution
 grep -r "exec(" src/
 grep -r "spawn(" src/
 
-# File operations
+# Find file operations
 grep -r "fs.readFile" src/
 grep -r "fs.writeFile" src/
 ```
@@ -746,94 +443,100 @@ grep -r "fs.writeFile" src/
 ### Step 3: Manual Code Review
 
 For each security area:
-1. Check patterns in code
-2. Validate against best practices
+1. Run automated checks
+2. Apply checklist
 3. Document findings
-4. Prioritize by risk
-
-### Step 4: Generate Report
+4. Prioritize by severity
 
 ---
 
-## Comprehensive Security Report Format
+## Security Report Format
 
 ```markdown
 # Security Review Report
 
 **Date**: [Date]
 **Reviewer**: Security Review Skill
-**Scope**: Full security audit
+**Scope**: [Files reviewed]
 
 ## Executive Summary
 
-### Overall Security Posture: [SECURE/VULNERABLE/CRITICAL]
+### Overall Security Posture: [SECURE / VULNERABLE / CRITICAL]
 
-### Critical Issues: [Count]
-### High Priority: [Count]
-### Medium Priority: [Count]
-### Low Priority: [Count]
+- **Critical Issues**: [count]
+- **High Priority**: [count]
+- **Medium Priority**: [count]
+- **Low Priority**: [count]
+
+---
 
 ## Critical Issues (Fix Immediately)
 
-### 1. Hardcoded Secret Found
+### 1. [Vulnerability Name]
 - **File**: `file.ts:line`
-- **Category**: Secret Handling
-- **Risk**: CRITICAL - Credential exposure
-- **Problem**: API key hardcoded in source code
-- **Impact**: If repository is leaked, credentials are compromised
-- **Fix**:
-  1. Remove hardcoded secret
-  2. Add to GitHub Secrets
-  3. Use core.getInput() to retrieve
-  4. Rotate the exposed secret
+- **Category**: [Secret Handling / Injection / etc.]
+- **Severity**: CRITICAL
+- **Problem**: [Description]
+- **Impact**: [What attacker can do]
+- **Remediation**:
+  ```typescript
+  // Current (vulnerable)
+  [bad code]
 
-### 2. Command Injection Vulnerability
-- **File**: `file.ts:line`
-- **Category**: Injection
-- **Risk**: CRITICAL - Arbitrary command execution
-- **Problem**: User input concatenated into command string
-- **Impact**: Attacker can execute arbitrary commands
-- **Fix**:
-  1. Use parameterized execution: `exec.exec('cmd', [arg1, arg2])`
-  2. Validate all inputs before use
+  // Fixed
+  [good code]
+  ```
+
+---
 
 ## High Priority Issues
 
-### 1. Path Traversal Vulnerability
-- **File**: `file.ts:line`
-- **Category**: File System Security
-- **Risk**: HIGH - Unauthorized file access
-- **Problem**: User-provided path not validated
-- **Impact**: Attacker can read/write arbitrary files
-- **Fix**:
-  1. Normalize path: `path.normalize()`
-  2. Validate against base directory
-  3. Reject if outside allowed paths
+[Same format as Critical]
+
+---
 
 ## Medium Priority Issues
 
-[Similar format]
+[Same format]
+
+---
 
 ## Low Priority Issues
 
-[Similar format]
+[Same format]
+
+---
 
 ## OWASP Top 10 Assessment
 
-| Category | Status | Issues Found |
-|----------|--------|--------------|
+| Category | Status | Issues |
+|----------|--------|--------|
 | Injection | ✅/⚠️/❌ | [count] |
-| Broken Authentication | ✅/⚠️/❌ | [count] |
-| Sensitive Data Exposure | ✅/⚠️/❌ | [count] |
-| XML External Entities | ✅/⚠️/❌ | [count] |
-| Broken Access Control | ✅/⚠️/❌ | [count] |
-| Security Misconfiguration | ✅/⚠️/❌ | [count] |
-| Cross-Site Scripting | ✅/⚠️/❌ | [count] |
-| Insecure Deserialization | ✅/⚠️/❌ | [count] |
-| Components with Vulnerabilities | ✅/⚠️/❌ | [count] |
-| Insufficient Logging | ✅/⚠️/❌ | [count] |
+| Cryptographic Failures | ✅/⚠️/❌ | [count] |
+| [etc] | | |
 
-## Dependency Vulnerabilities
+---
+
+## Recommendations
+
+### Immediate (This Week)
+1. Fix all critical issues
+2. Rotate any exposed credentials
+3. [...]
+
+### Short-term (This Month)
+1. Fix high priority issues
+2. Add security tests
+3. [...]
+
+### Long-term (This Quarter)
+1. Automated security scanning in CI/CD
+2. Regular dependency audits
+3. Security training
+
+---
+
+## Dependencies Audit
 
 ```bash
 npm audit summary:
@@ -844,55 +547,14 @@ Low: [count]
 ```
 
 **Action Required**:
-1. [Package](version): [Vulnerability]
-   - Update to: [version]
+- Update [package] to [version] (fixes CVE-XXXX-YYYY)
 
-## Security Best Practices Found
+---
 
-✅ Secrets from GitHub Secrets (inputs.ts)
-✅ Parameterized command execution (@actions/exec)
-✅ Path normalization (path.join, path.normalize)
-✅ Temp file cleanup (main.ts finally block)
-✅ SSL configuration (ssl-utils.ts)
-✅ Input validation (validators.ts)
-
-## Security Anti-Patterns Found
-
-❌ [Anti-pattern] at `file.ts:line`
-
-## Recommendations
-
-### Immediate Actions (This Week)
-1. Remove all hardcoded secrets
-2. Fix command injection vulnerabilities
-3. Add input validation to all external inputs
-4. Rotate any exposed credentials
-
-### Short-term Actions (This Month)
-1. Review all file operations for path traversal
-2. Add security headers
-3. Implement rate limiting if applicable
-4. Set up automated security scanning in CI/CD
-
-### Long-term Actions (This Quarter)
-1. Regular dependency audits (weekly)
-2. Security training for team
-3. Penetration testing
-4. Implement security monitoring
-
-## Compliance Considerations
-
-- **GDPR**: Handle user data appropriately
-- **SOC 2**: Audit logging, access controls
-- **PCI DSS**: If handling payment data
-- **HIPAA**: If handling health data
-
-## Next Steps
-
-1. Address critical issues immediately
-2. Create GitHub issues for high/medium priority items
-3. Schedule security review after fixes
-4. Set up automated security scanning
+**Next Steps**:
+1. Address critical findings immediately
+2. Create issues for high/medium
+3. Schedule re-review after fixes
 ```
 
 ---
@@ -900,34 +562,20 @@ Low: [count]
 ## Best Practices
 
 ### Review Principles
-- **Risk-based**: Prioritize by impact and likelihood
+- **Risk-based**: Prioritize by impact and exploitability
 - **Comprehensive**: Cover all OWASP Top 10
-- **Actionable**: Provide specific fix recommendations
+- **Actionable**: Provide specific remediation with code examples
 - **Verifiable**: Include file:line references
 
 ### When to Run
 - Before every release
 - After adding new features
 - When dependencies change
-- Weekly as part of security hygiene
 - After security incidents
+- Weekly as part of security hygiene
 
 ### Tools to Use
 - `npm audit` for dependency scanning
 - `grep` for pattern-based searching
 - Manual code review for logic flaws
-- Static analysis tools (ESLint security plugins)
-
----
-
-## Example Usage
-
-**User**: "Review code security"
-
-**Response**:
-1. Run npm audit
-2. Search for dangerous patterns
-3. Review each security area
-4. Generate comprehensive report
-5. Prioritize by risk level
-6. Provide specific fixes
+- GitHub security alerts for vulnerable dependencies

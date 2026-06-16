@@ -18,23 +18,17 @@ Run this skill when the user requests:
 - "Create a new service for [feature]"
 - "Write tests to cover [functionality]"
 
-## Generation Modes
+## Comprehensive Code Generation
 
-### Mode 1: Component Generation
-Generate new TypeScript modules, classes, services, and utilities.
-
-### Mode 2: Test Generation
-Generate unit tests and contract/e2e tests with proper mocking.
-
-### Mode 3: Documentation Generation
-Generate JSDoc comments, README sections, and inline documentation.
-
-### Mode 4: Type-Safe Refactoring
-Refactor existing code to improve type safety and strict TypeScript compliance.
+This skill performs complete code generation covering:
+1. Component Generation (models, validators, services, utilities)
+2. Test Generation (unit and E2E tests)
+3. Documentation Generation (JSDoc, README, inline comments)
+4. Type-Safe Code (strict TypeScript compliance)
 
 ---
 
-## Mode 1: Component Generation
+## Section 1: Component Generation
 
 ### Code Generation Principles
 
@@ -406,7 +400,7 @@ function processError(error: unknown): string {
 
 ---
 
-## Mode 2: Test Generation
+## Section 2: Test Generation
 
 ### Test Types
 
@@ -612,7 +606,7 @@ Object.defineProperty(inputs, 'PARAM', {
 
 ---
 
-## Mode 3: Documentation Generation
+## Section 3: Documentation Generation
 
 ### JSDoc Standards
 
@@ -718,7 +712,7 @@ export class ServiceName {
 
 ---
 
-## Mode 4: Type-Safe Refactoring
+## Section 4: Type-Safe Refactoring
 
 ### Making Code Type-Safe
 

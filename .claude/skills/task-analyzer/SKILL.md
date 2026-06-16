@@ -18,33 +18,120 @@ Run this skill when the user asks:
 - "Analyze this feature implementation"
 - "Create implementation plan for [feature]"
 
-## Analysis Process
+## How to Use
 
-### Step 1: Understand the Feature
+When analyzing a feature request:
 
-**Questions to Answer**:
-1. What is the feature?
-2. What product/component does it affect?
-3. What inputs are needed?
-4. What outputs are expected?
-5. What integration points exist?
+1. **Parse the request** — Extract what, scope, trigger, output
+2. **Read current state** — Review relevant source files first
+3. **Map full change surface** — Identify ALL files that must change
+4. **Identify breakage risks** — Use Risk ID system (R1-R10)
+5. **Write structured output** — Generate implementation plan with risk assessment
+
+**Never guess** — read source files before mapping changes.
+
+---
+
+## Step 1 — Parse the Feature Request
+
+Extract from the user's request:
+
+- **What** — the capability being added (new product, new param, behavior change, etc.)
+- **Scope** — which product(s) affected (Polaris, Coverity, Black Duck SCA, SRM, all)
+- **Trigger** — GitHub Action input, Bridge CLI version, environment variable
+- **Output** — what changes at runtime (new JSON field to Bridge CLI, new artifact, new API call)
+
+If any of these is unclear, **ask before proceeding**.
 
 **Example**:
 ```
 Feature: Add support for a new security product "Seeker"
-- Product: DAST/IAST scanning
-- Inputs: Seeker server URL, API token, project name, scan type
-- Outputs: SARIF report, scan results
-- Integration: Bridge CLI execution, GitHub reporting
+- What: New DAST/IAST product integration
+- Scope: New product (similar to Polaris, Coverity)
+- Trigger: GitHub Action inputs (seeker_server_url, seeker_api_token)
+- Output: JSON input file for Bridge CLI, SARIF report
 ```
 
 ---
 
-### Step 2: Map Affected Files
+## Step 2 — Read Current State
 
-Identify ALL files that need changes:
+Before mapping changes, **read the relevant source files**. Use this dependency map:
 
-#### Core Changes (Required)
+```
+Feature type                → Read these files first
+─────────────────────────────────────────────────────────────────────
+New Action input            → inputs.ts, application-constants.ts, action.yml
+New product                 → input-data/{closest product}.ts, tools-parameter.ts, validators.ts
+Behavior change in scan     → tools-parameter.ts → getFormattedCommandFor{Product}()
+Bridge CLI version gate     → utility.ts → version helpers, application-constants.ts → VERSION constants
+SARIF / report change       → main.ts (SARIF upload), utility.ts → updatePolarisSarifPath()
+GitHub API change           → service/impl/, factory/
+Proxy / SSL change          → proxy-utils.ts, ssl-utils.ts
+Dependency upgrade          → package.json, package-lock.json, dist/
+Error handling              → application-constants.ts → EXIT_CODE_MAP, main.ts error handling
+```
+
+---
+
+## Step 3 — Map the Full Change Surface
+
+For each changed file, determine:
+- **Why** it must change (not just "it's related")
+- **What specifically** changes (new export, new field, new condition)
+- **Risk level** — see Risk IDs below
+
+Use this canonical file inventory to check every layer:
+
+### Layer 1 — Constants and Types (always check first)
+
+| File | Change if |
+|---|---|
+| `application-constants.ts` | New input key, exit code, version threshold, or message string needed |
+| `input-data/{product}.ts` | New field in product config sent to Bridge CLI |
+
+### Layer 2 — Input and Validation
+
+| File | Change if |
+|---|---|
+| `inputs.ts` | New input parameter exported |
+| `validators.ts` | New required-field check, new allowed-value list, cross-param validation |
+
+### Layer 3 — Command Building
+
+| File | Change if |
+|---|---|
+| `tools-parameter.ts` | New field in JSON input file, new `--stage` flag, new product command builder |
+| `bridge-cli.ts` | New product stage wired into `prepareCommand()`, new version detection |
+
+### Layer 4 — Orchestration and Output
+
+| File | Change if |
+|---|---|
+| `main.ts` | New SARIF upload block, new artifact logic, new build status path |
+| `artifacts.ts` | New artifact type uploaded |
+| `service/` | New GitHub API call, new service implementation |
+| `factory/` | New service selection logic |
+| `utility.ts` | New version helper, new path resolution, new HTTP client variant |
+
+### Layer 5 — Action Metadata
+
+| File | Change if |
+|---|---|
+| `action.yml` | New input, version bump |
+| `package.json` | Dependency change, version bump |
+| `README.md` | New feature documentation, usage examples |
+
+### Layer 6 — Tests
+
+| File | Change if |
+|---|---|
+| `test/unit/**/*.test.ts` | Any logic change in corresponding module |
+| `test/contract/**/*.e2e.test.ts` | New product workflow, integration scenario |
+
+---
+
+### Core Changes (Required)
 
 **1. Action Definition** (`action.yml`)
 - Add new inputs for the product
@@ -106,7 +193,26 @@ Identify ALL files that need changes:
 
 ---
 
-### Step 3: Identify Dependencies
+## Step 4 — Identify Breakage Risks
+
+For each change, assess against these risk categories:
+
+| Risk ID | Risk | Triggered by | Severity |
+|---|---|---|---|
+| R1 | **Workflow breakage** | Removing/renaming input without deprecation, making optional param required | HIGH |
+| R2 | **Bridge CLI version breakage** | New behavior without version gate, assumed universal support | HIGH |
+| R3 | **Build status breakage** | New exit code not in EXIT_CODE_MAP, changed mark_build_status logic | MEDIUM |
+| R4 | **SARIF upload failure** | Path not version-gated (v1 vs v2.0+), incorrect path resolution | MEDIUM |
+| R5 | **Air-gap mode breakage** | New download operation not gated behind `!NETWORK_AIRGAP` check | HIGH |
+| R6 | **Credential exposure** | Secret logged, written to workspace, not masked with core.setSecret() | CRITICAL |
+| R7 | **GitHub API breakage** | Incorrect service selection, Cloud vs Enterprise compatibility | MEDIUM |
+| R8 | **Test regression** | Model interface changed, inputs renamed, validator return type changed | LOW |
+| R9 | **Action metadata mismatch** | action.yml inputs don't match application-constants.ts keys | HIGH |
+| R10 | **Dependency breakage** | New dependency not in dist/, incompatible version, missing in package-lock.json | MEDIUM |
+
+---
+
+### Step 5: Identify Dependencies
 
 **Internal Dependencies**:
 - What existing code does this depend on?
@@ -177,38 +283,86 @@ Create step-by-step implementation plan:
 
 ---
 
-## Output Format
+## Step 6 — Generate Implementation Plan
 
-Generate a structured implementation plan document:
+Output a structured implementation plan document:
 
 ```markdown
 # Implementation Plan: [Feature Name]
 
-## Feature Summary
+## Summary
+[One paragraph: what the feature does, which products it affects, what changes at runtime]
 
-**Description**: [What the feature does]
-**Product**: [Which product/component]
-**Priority**: HIGH/MEDIUM/LOW
-**Estimated Complexity**: LOW/MEDIUM/HIGH
-
-## Requirements Analysis
-
-### Inputs Required
-- `[input_name]` (required): [Description]
-- `[input_name]` (optional): [Description]
-
-### Outputs Expected
-- [Output description]
-- [SARIF reports, artifacts, etc.]
-
-### Integration Points
-- Bridge CLI: [How it integrates]
-- GitHub: [SARIF upload, PR comments, etc.]
-- Other: [Any other integrations]
+## Feature Scope
+- **Type**: [New product | New parameter | Behavior change | Version gate | Integration]
+- **Products affected**: [Polaris | Coverity | Black Duck SCA | SRM | All | N/A]
+- **Trigger**: [Action input | Bridge CLI version | Environment variable]
+- **Runtime output**: [New JSON field to Bridge CLI | New artifact | New API call]
 
 ---
 
-## File Change Map
+## Files to Change
+
+### Must Change
+| File | Change | Risk |
+|---|---|---|
+| `src/application-constants.ts` | Add `MYPRODUCT_SERVER_URL_KEY`, `MYPRODUCT_ACCESS_TOKEN_KEY` constants | R9 |
+| `src/blackduck-security-action/inputs.ts` | Export `MYPRODUCT_SERVER_URL`, `MYPRODUCT_ACCESS_TOKEN` | R1 |
+| `src/blackduck-security-action/input-data/myproduct.ts` | Create `MyProductData` interface extending `Common` | R8 |
+| `src/blackduck-security-action/validators.ts` | Add `validateMyProductInputs(): string[]` | R1, R8 |
+| `src/blackduck-security-action/tools-parameter.ts` | Add `getFormattedCommandForMyProduct()`, write `myproduct_input.json` | R2, R4 |
+| `src/blackduck-security-action/bridge-cli.ts` | Call `validateMyProductInputs()` in `prepareCommand()` | R1 |
+| `action.yml` | Add `myproduct_server_url`, `myproduct_access_token` inputs | R9 |
+
+### May Change (conditional on final design)
+| File | Change | Condition |
+|---|---|---|
+| `src/main.ts` | Add SARIF upload for MyProduct | Only if product generates SARIF |
+| `src/blackduck-security-action/utility.ts` | Add MyProduct-specific SARIF path resolution | Only if SARIF path differs from standard |
+
+---
+
+## Breakage Risk Assessment
+
+| Risk ID | Risk | Affected scenario | Mitigation |
+|---|---|---|---|
+| R1 | Workflow breakage | N/A (new product, no existing users) | None needed |
+| R2 | Bridge CLI version | Users on Bridge CLI < X.Y.Z won't have MyProduct support | Document minimum Bridge CLI version, add version check if possible |
+| R4 | SARIF upload failure | MyProduct SARIF path might differ | Test with both Bridge CLI v1 and v2.0+, verify path detection |
+| R8 | Test regression | New interfaces could break tests | Add comprehensive test coverage before merge |
+| R9 | Action metadata mismatch | action.yml keys must match constants | Double-check naming consistency |
+
+**Overall risk**: [LOW | MEDIUM | HIGH]
+**Reason**: [One sentence on the dominant risk factor]
+
+---
+
+## Implementation Order
+
+Steps in the correct dependency order (later steps depend on earlier):
+
+1. `application-constants.ts` — add constants (all other files import from here)
+2. `input-data/myproduct.ts` — create data model interface
+3. `inputs.ts` — export new input constants
+4. `validators.ts` — add validation function
+5. `tools-parameter.ts` — add command builder method
+6. `bridge-cli.ts` — wire into prepareCommand()
+7. `action.yml` — add action inputs
+8. `test/unit/` — add unit tests for validator and command builder
+9. `test/contract/` — add E2E test for full workflow
+10. `npm run all` — verify build, lint, tests pass
+
+---
+
+## Open Questions
+
+[List any decisions that must be made before implementation starts. If none, write "None."]
+
+- [ ] What is the minimum Bridge CLI version that supports MyProduct?
+- [ ] Does MyProduct generate SARIF reports? If yes, what's the output path?
+- [ ] Are there any MyProduct-specific configuration fields beyond URL/token?
+
+---
 
 ### Files to Create (New)
 1. **`src/blackduck-security-action/input-data/[product].ts`**
@@ -704,47 +858,6 @@ None expected - Following established patterns
 4. Test incrementally
 5. Document as you go
 ```
-
----
-
-## Analysis Modes
-
-### Mode 1: New Product Addition
-Used when adding a new security product (like Polaris, Coverity, etc.)
-
-**Steps**:
-1. Map all required files
-2. Identify product-specific requirements
-3. Plan validation logic
-4. Plan command building
-5. Plan testing strategy
-
-### Mode 2: Feature Enhancement
-Used when enhancing an existing feature
-
-**Steps**:
-1. Identify affected components
-2. Assess backward compatibility
-3. Plan migration path
-4. Identify breaking changes
-
-### Mode 3: Refactoring Analysis
-Used when planning code refactoring
-
-**Steps**:
-1. Identify code smells
-2. Plan refactoring approach
-3. Assess impact on existing code
-4. Plan incremental changes
-
-### Mode 4: Bug Fix Analysis
-Used when analyzing bug fix requirements
-
-**Steps**:
-1. Identify root cause
-2. Identify affected code paths
-3. Plan fix approach
-4. Plan regression tests
 
 ---
 
