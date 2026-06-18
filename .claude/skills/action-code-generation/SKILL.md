@@ -1,5 +1,5 @@
 ---
-name: code-generation
+name: action-code-generation
 description: Comprehensive code generation skill that generates new TypeScript components, modules, services, utilities, tests, and documentation following Black Duck Security Scan codebase patterns and best practices. Ensures type safety, proper error handling, consistent code style, and comprehensive test coverage.
 ---
 

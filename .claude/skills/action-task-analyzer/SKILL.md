@@ -1,5 +1,5 @@
 ---
-name: task-analyzer
+name: action-task-analyzer
 description: Analyzes implementation requirements for new features in the Black Duck Security Scan codebase. Reads the codebase, maps every file that must change, identifies breakage risks, dependencies, and writes a structured implementation plan with prioritized changes and risk assessment. Use when planning feature implementations or analyzing impact of proposed changes.
 ---
 

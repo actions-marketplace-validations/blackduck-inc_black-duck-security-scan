@@ -1,5 +1,5 @@
 ---
-name: code-review
+name: action-code-review
 description: Comprehensive code review skill that analyzes code quality across linting/formatting, type safety, error handling, refactoring opportunities, testing quality, design patterns, and documentation. Use for thorough code quality analysis. For security-specific reviews, use the security-review skill instead.
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: code-explainer
+name: action-code-explainer
 description: Comprehensive code explanation skill that analyzes and explains the Black Duck Security Scan codebase architecture, execution flow, data flow, design patterns, and component relationships. Use when users ask "how does this work", "explain the architecture", "trace the execution", or "what patterns are used".
 ---
 
