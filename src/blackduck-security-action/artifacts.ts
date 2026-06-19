@@ -64,6 +64,16 @@ export function restoreNoProxy(saved: {originalNoProxy: string | undefined; orig
   debug('Restored NO_PROXY to original value after artifact upload')
 }
 
+async function withArtifactProxyBypass<T>(fn: () => Promise<T>): Promise<T> {
+  const savedNoProxy = isGitHubCloud() ? addArtifactDomainsToNoProxy() : null
+  try {
+    return await fn()
+  } finally {
+    if (savedNoProxy) {
+      restoreNoProxy(savedNoProxy)
+    }
+  }
+}
 
 export async function uploadDiagnostics(): Promise<UploadArtifactResponse | void> {
   let artifactClient
@@ -90,14 +100,7 @@ export async function uploadDiagnostics(): Promise<UploadArtifactResponse | void
     }
   }
   if (files.length > 0) {
-    const savedNoProxy = isGitHubCloud() ? addArtifactDomainsToNoProxy() : null
-    try {
-      return await artifactClient.uploadArtifact('bridge_diagnostics_'.concat(getRealSystemTime()), files, pwd, options)
-    } finally {
-      if (savedNoProxy) {
-        restoreNoProxy(savedNoProxy)
-      }
-    }
+    return await withArtifactProxyBypass(() => artifactClient.uploadArtifact('bridge_diagnostics_'.concat(getRealSystemTime()), files, pwd, options))
   }
 }
 
@@ -151,13 +154,6 @@ export async function uploadSarifReportAsArtifact(defaultSarifReportDirectory: s
   }
 
   if ((await exists(rootDir)) && checkIfPathExists(sarifFilePath)) {
-    const savedNoProxy = isGitHubCloud() ? addArtifactDomainsToNoProxy() : null
-    try {
-      return await artifactClient.uploadArtifact(artifactName, [sarifFilePath], rootDir, options)
-    } finally {
-      if (savedNoProxy) {
-        restoreNoProxy(savedNoProxy)
-      }
-    }
+    return await withArtifactProxyBypass(() => artifactClient.uploadArtifact(artifactName, [sarifFilePath], rootDir, options))
   }
 }

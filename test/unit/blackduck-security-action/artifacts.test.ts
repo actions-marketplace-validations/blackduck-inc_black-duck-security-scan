@@ -94,36 +94,21 @@ describe('uploadSarifReport', () => {
 })
 
 describe('addArtifactDomainsToNoProxy', () => {
+  const PROXY_ENV_KEYS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy']
   const savedEnv: Record<string, string | undefined> = {}
 
   beforeEach(() => {
-    savedEnv.HTTPS_PROXY = process.env.HTTPS_PROXY
-    savedEnv.https_proxy = process.env.https_proxy
-    savedEnv.HTTP_PROXY = process.env.HTTP_PROXY
-    savedEnv.http_proxy = process.env.http_proxy
-    savedEnv.NO_PROXY = process.env.NO_PROXY
-    savedEnv.no_proxy = process.env.no_proxy
-    delete process.env.HTTPS_PROXY
-    delete process.env.https_proxy
-    delete process.env.HTTP_PROXY
-    delete process.env.http_proxy
-    delete process.env.NO_PROXY
-    delete process.env.no_proxy
+    for (const key of PROXY_ENV_KEYS) {
+      savedEnv[key] = process.env[key]
+      delete process.env[key]
+    }
   })
 
   afterEach(() => {
-    if (savedEnv.HTTPS_PROXY !== undefined) process.env.HTTPS_PROXY = savedEnv.HTTPS_PROXY
-    else delete process.env.HTTPS_PROXY
-    if (savedEnv.https_proxy !== undefined) process.env.https_proxy = savedEnv.https_proxy
-    else delete process.env.https_proxy
-    if (savedEnv.HTTP_PROXY !== undefined) process.env.HTTP_PROXY = savedEnv.HTTP_PROXY
-    else delete process.env.HTTP_PROXY
-    if (savedEnv.http_proxy !== undefined) process.env.http_proxy = savedEnv.http_proxy
-    else delete process.env.http_proxy
-    if (savedEnv.NO_PROXY !== undefined) process.env.NO_PROXY = savedEnv.NO_PROXY
-    else delete process.env.NO_PROXY
-    if (savedEnv.no_proxy !== undefined) process.env.no_proxy = savedEnv.no_proxy
-    else delete process.env.no_proxy
+    for (const key of PROXY_ENV_KEYS) {
+      if (savedEnv[key] !== undefined) process.env[key] = savedEnv[key]
+      else delete process.env[key]
+    }
   })
 
   it('should not modify NO_PROXY when no proxy is configured', () => {
