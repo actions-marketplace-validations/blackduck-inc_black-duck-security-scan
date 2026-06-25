@@ -86,6 +86,7 @@ export interface Test {
 interface TestDetails {
   type?: string | string[]
   location?: string
+  containerName?: string
 }
 
 export interface ExternalIssues {

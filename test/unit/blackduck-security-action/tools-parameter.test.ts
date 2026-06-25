@@ -36,6 +36,8 @@ beforeEach(() => {
   Object.defineProperty(inputs, 'POLARIS_TEST_SAST_LOCATION', {value: undefined, configurable: true})
   Object.defineProperty(inputs, 'POLARIS_TEST_SCA_TYPE', {value: undefined, configurable: true})
   Object.defineProperty(inputs, 'POLARIS_TEST_SAST_TYPE', {value: undefined, configurable: true})
+  Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: undefined, configurable: true})
+  Object.defineProperty(inputs, 'POLARIS_ARTIFACT_TO_UPLOAD', {value: undefined, configurable: true})
 })
 
 afterAll(() => {
@@ -1259,6 +1261,169 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/binary.war')
+  })
+
+  test('Test getFormattedCommandForPolaris - SCA Container with containerName and artifactToUpload', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SCA'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SCA_TYPE', {value: 'SCA-CONTAINER'})
+    Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: 'myapp:latest'})
+    Object.defineProperty(inputs, 'POLARIS_ARTIFACT_TO_UPLOAD', {value: '/path/to/container.tar.gz'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+    expect(resp).toContain('--stage polaris')
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.assessment.types).toEqual(['SCA'])
+    expect(jsonData.data.polaris.test.sca.type).toBe('SCA-CONTAINER')
+    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/container.tar.gz')
+  })
+
+  test('Test getFormattedCommandForPolaris - SCA Container with containerName only (no artifact)', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SCA'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SCA_TYPE', {value: 'SCA-CONTAINER'})
+    Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: 'myapp:latest'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+    expect(resp).toContain('--stage polaris')
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.assessment.types).toEqual(['SCA'])
+    expect(jsonData.data.polaris.test.sca.type).toBe('SCA-CONTAINER')
+    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.artifactToUpload).toBeUndefined()
+  })
+
+  test('Test getFormattedCommandForPolaris - containerName with SCA-BINARY type', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SCA'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SCA_TYPE', {value: 'SCA-BINARY'})
+    Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: 'myapp:latest'})
+    Object.defineProperty(inputs, 'POLARIS_ARTIFACT_TO_UPLOAD', {value: '/path/to/binary.jar'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+    expect(resp).toContain('--stage polaris')
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.test.sca.type).toBe('SCA-BINARY')
+    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/binary.jar')
+  })
+
+  test('Test getFormattedCommandForPolaris - containerName without SCA type', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SCA'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: 'myapp:latest'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+    expect(resp).toContain('--stage polaris')
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.test.sca.type).toBeUndefined()
+  })
+
+  test('Test getFormattedCommandForPolaris - containerName with SCA-CONTAINER and SAST', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SCA,SAST'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SCA_TYPE', {value: 'SCA-CONTAINER'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SAST_TYPE', {value: 'SAST_RAPID'})
+    Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: 'myapp:latest'})
+    Object.defineProperty(inputs, 'POLARIS_ARTIFACT_TO_UPLOAD', {value: '/path/to/container.tar.gz'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.assessment.types).toEqual(['SCA', 'SAST'])
+    expect(jsonData.data.polaris.test.sca.type).toBe('SCA-CONTAINER')
+    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.test.sast.type).toContain('SAST_RAPID')
+    expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/container.tar.gz')
+  })
+
+  test('Test getFormattedCommandForPolaris - containerName with SAST location', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SAST'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SAST_LOCATION', {value: 'src', configurable: true})
+    Object.defineProperty(inputs, 'POLARIS_CONTAINER_NAME', {value: 'myapp:latest'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.test.sast.location).toBe('src')
+    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.test.sca.type).toBeUndefined()
+  })
+
+  test('Test getFormattedCommandForPolaris - without containerName (backward compatibility)', () => {
+    Object.defineProperty(inputs, 'POLARIS_SERVER_URL', {value: 'server_url'})
+    Object.defineProperty(inputs, 'POLARIS_ACCESS_TOKEN', {value: 'access_token'})
+    Object.defineProperty(inputs, 'POLARIS_APPLICATION_NAME', {value: 'POLARIS_APPLICATION_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_PROJECT_NAME', {value: 'POLARIS_PROJECT_NAME'})
+    Object.defineProperty(inputs, 'POLARIS_ASSESSMENT_TYPES', {value: 'SCA'})
+    Object.defineProperty(inputs, 'POLARIS_BRANCH_NAME', {value: 'main'})
+    Object.defineProperty(inputs, 'POLARIS_TEST_SCA_TYPE', {value: 'SCA-PACKAGE'})
+
+    const stp: BridgeToolsParameter = new BridgeToolsParameter(tempPath)
+    const resp = stp.getFormattedCommandForPolaris('blackduck-security-action')
+
+    expect(resp).not.toBeNull()
+    expect(resp).toContain('--stage polaris')
+
+    const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
+    const jsonData = JSON.parse(jsonString)
+    expect(jsonData.data.polaris.test.sca.type).toBe('SCA-PACKAGE')
+    expect(jsonData.data.polaris.test.sca.containerName).toBeUndefined()
   })
 
   it('Test getFormattedCommandForPolaris - badges failure (empty github token)', () => {
