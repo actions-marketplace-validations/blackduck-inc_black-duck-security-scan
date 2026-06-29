@@ -92,14 +92,13 @@ export class BridgeToolsParameter {
       polData.data.polaris.branch = {name: this.getGithubBranchName()}
     }
 
-    if (inputs.POLARIS_TEST_SCA_TYPE || inputs.POLARIS_TEST_SAST_TYPE || inputs.POLARIS_TEST_SCA_LOCATION || inputs.POLARIS_TEST_SAST_LOCATION || inputs.POLARIS_CONTAINER_NAME) {
+    if (inputs.POLARIS_TEST_SCA_TYPE || inputs.POLARIS_TEST_SAST_TYPE || inputs.POLARIS_TEST_SCA_LOCATION || inputs.POLARIS_TEST_SAST_LOCATION) {
       polData.data.polaris.test = {}
 
-      if (inputs.POLARIS_TEST_SCA_TYPE || inputs.POLARIS_TEST_SCA_LOCATION || inputs.POLARIS_CONTAINER_NAME) {
+      if (inputs.POLARIS_TEST_SCA_TYPE || inputs.POLARIS_TEST_SCA_LOCATION) {
         polData.data.polaris.test.sca = {
           ...(inputs.POLARIS_TEST_SCA_TYPE && {type: inputs.POLARIS_TEST_SCA_TYPE}),
-          ...(inputs.POLARIS_TEST_SCA_LOCATION && {location: inputs.POLARIS_TEST_SCA_LOCATION}),
-          ...(inputs.POLARIS_CONTAINER_NAME && {containerName: inputs.POLARIS_CONTAINER_NAME})
+          ...(inputs.POLARIS_TEST_SCA_LOCATION && {location: inputs.POLARIS_TEST_SCA_LOCATION})
         }
       }
 
@@ -115,6 +114,12 @@ export class BridgeToolsParameter {
 
     if (inputs.POLARIS_ARTIFACT_TO_UPLOAD) {
       polData.data.polaris.artifactToUpload = inputs.POLARIS_ARTIFACT_TO_UPLOAD
+    }
+
+    if (inputs.POLARIS_CONTAINER_NAME) {
+      polData.data.polaris.container = {
+        name: inputs.POLARIS_CONTAINER_NAME
+      }
     }
 
     if (isBoolean(inputs.POLARIS_WAITFORSCAN)) {

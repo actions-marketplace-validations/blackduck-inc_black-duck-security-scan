@@ -48,6 +48,11 @@ export interface PolarisData extends Common {
   policy?: Policy
   externalIssues?: ExternalIssues
   artifactToUpload?: string
+  container?: Container
+}
+
+export interface Container {
+  name?: string
 }
 
 export interface Policy {
@@ -86,7 +91,6 @@ export interface Test {
 interface TestDetails {
   type?: string | string[]
   location?: string
-  containerName?: string
 }
 
 export interface ExternalIssues {

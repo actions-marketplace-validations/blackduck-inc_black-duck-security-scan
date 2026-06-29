@@ -1284,7 +1284,7 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.assessment.types).toEqual(['SCA'])
     expect(jsonData.data.polaris.test.sca.type).toBe('SCA-CONTAINER')
-    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.container.name).toBe('myapp:latest')
     expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/container.tar.gz')
   })
 
@@ -1308,7 +1308,7 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.assessment.types).toEqual(['SCA'])
     expect(jsonData.data.polaris.test.sca.type).toBe('SCA-CONTAINER')
-    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.container.name).toBe('myapp:latest')
     expect(jsonData.data.polaris.artifactToUpload).toBeUndefined()
   })
 
@@ -1332,7 +1332,7 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.test.sca.type).toBe('SCA-BINARY')
-    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.container.name).toBe('myapp:latest')
     expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/binary.jar')
   })
 
@@ -1353,8 +1353,8 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
 
     const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
     const jsonData = JSON.parse(jsonString)
-    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
-    expect(jsonData.data.polaris.test.sca.type).toBeUndefined()
+    expect(jsonData.data.polaris.container.name).toBe('myapp:latest')
+    expect(jsonData.data.polaris.test).toBeUndefined()
   })
 
   test('Test getFormattedCommandForPolaris - containerName with SCA-CONTAINER and SAST', () => {
@@ -1378,7 +1378,7 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.assessment.types).toEqual(['SCA', 'SAST'])
     expect(jsonData.data.polaris.test.sca.type).toBe('SCA-CONTAINER')
-    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
+    expect(jsonData.data.polaris.container.name).toBe('myapp:latest')
     expect(jsonData.data.polaris.test.sast.type).toContain('SAST_RAPID')
     expect(jsonData.data.polaris.artifactToUpload).toBe('/path/to/container.tar.gz')
   })
@@ -1401,8 +1401,8 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.test.sast.location).toBe('src')
-    expect(jsonData.data.polaris.test.sca.containerName).toBe('myapp:latest')
-    expect(jsonData.data.polaris.test.sca.type).toBeUndefined()
+    expect(jsonData.data.polaris.container.name).toBe('myapp:latest')
+    expect(jsonData.data.polaris.test.sca).toBeUndefined()
   })
 
   test('Test getFormattedCommandForPolaris - without containerName (backward compatibility)', () => {
@@ -1423,7 +1423,7 @@ describe('test polaris values passed correctly to bridge for workflow simplifica
     const jsonString = fs.readFileSync(tempPath.concat(polaris_input_file), 'utf-8')
     const jsonData = JSON.parse(jsonString)
     expect(jsonData.data.polaris.test.sca.type).toBe('SCA-PACKAGE')
-    expect(jsonData.data.polaris.test.sca.containerName).toBeUndefined()
+    expect(jsonData.data.polaris.container).toBeUndefined()
   })
 
   it('Test getFormattedCommandForPolaris - badges failure (empty github token)', () => {
