@@ -97568,7 +97568,10 @@ module.exports = function getSideChannel() {
 	var channel = {
 		assert: function (key) {
 			if (!channel.has(key)) {
-				throw new $TypeError('Side channel does not contain ' + inspect(key));
+				var keyDesc = key && Object(key) === key
+					? 'the given object key'
+					: inspect(key);
+				throw new $TypeError('Side channel does not contain ' + keyDesc);
 			}
 		},
 		'delete': function (key) {
@@ -97588,7 +97591,7 @@ module.exports = function getSideChannel() {
 			$channelData.set(key, value);
 		}
 	};
-	// @ts-expect-error TODO: figure out why this is erroring
+
 	return channel;
 };
 
@@ -97880,7 +97883,7 @@ class ReadableState {
   }
 
   pipe(pipeTo, cb) {
-    if (this.pipeTo !== null) throw new Error('Can only pipe to one destination')
+    if (this.pipeTo !== null) throw StreamError.BAD_ARGUMENT('Can only pipe to one destination')
     if (typeof cb !== 'function') cb = null
 
     this.stream._duplexState |= READ_PIPE_DRAINED
@@ -98115,7 +98118,7 @@ class Pipeline {
 
       if (this.from !== null) {
         if ((this.from._duplexState & READ_DONE) === 0 || !this.pipeToFinished) {
-          this.from.destroy(this.error || new Error('Writable stream closed prematurely'))
+          this.from.destroy(this.error || StreamError.PREMATURE_CLOSE('Writable stream closed'))
         }
         return
       }
@@ -98126,7 +98129,7 @@ class Pipeline {
 
       if (this.to !== null) {
         if ((stream._duplexState & READ_DONE) === 0) {
-          this.to.destroy(this.error || new Error('Readable stream closed before ending'))
+          this.to.destroy(this.error || StreamError.PREMATURE_CLOSE('Readable stream closed'))
         }
         return
       }
@@ -98761,7 +98764,7 @@ function pipeline(stream, ...streams) {
   const all = Array.isArray(stream) ? [...stream, ...streams] : [stream, ...streams]
   const done = all.length && typeof all[all.length - 1] === 'function' ? all.pop() : null
 
-  if (all.length < 2) throw new Error('Pipeline requires at least 2 streams')
+  if (all.length < 2) throw StreamError.BAD_ARGUMENT('Pipeline requires at least 2 streams')
 
   let src = all[0]
   let dest = null
@@ -98942,6 +98945,10 @@ module.exports = class StreamError extends Error {
     return err && err.code === 'ABORTED'
   }
 
+  static isBadArgument(err) {
+    return err && err.code === 'BAD_ARGUMENT'
+  }
+
   get name() {
     return 'StreamError'
   }
@@ -98950,12 +98957,16 @@ module.exports = class StreamError extends Error {
     return new StreamError('Stream was destroyed', 'STREAM_DESTROYED', StreamError.STREAM_DESTROYED)
   }
 
-  static PREMATURE_CLOSE() {
-    return new StreamError('Premature close', 'PREMATURE_CLOSE', StreamError.PREMATURE_CLOSE)
+  static PREMATURE_CLOSE(msg = 'Premature close') {
+    return new StreamError(msg, 'PREMATURE_CLOSE', StreamError.PREMATURE_CLOSE)
   }
 
   static ABORTED() {
     return new StreamError('Stream aborted', 'ABORTED', StreamError.ABORTED)
+  }
+
+  static BAD_ARGUMENT(msg = 'Bad argument') {
+    return new StreamError(msg, 'BAD_ARGUMENT', StreamError.BAD_ARGUMENT)
   }
 }
 
@@ -142038,6 +142049,70 @@ function createClientLogger(namespace) {
 
 /***/ }),
 
+/***/ 41573:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var env_exports = {};
+__export(env_exports, {
+  emitNodeWarning: () => emitNodeWarning,
+  getEnvironmentVariable: () => getEnvironmentVariable,
+  isBrowser: () => isBrowser,
+  isBun: () => isBun,
+  isDeno: () => isDeno,
+  isNodeLike: () => isNodeLike,
+  isNodeRuntime: () => isNodeRuntime,
+  isReactNative: () => isReactNative,
+  isWebWorker: () => isWebWorker
+});
+module.exports = __toCommonJS(env_exports);
+var import_node_process = __toESM(__nccwpck_require__(1708));
+function getEnvironmentVariable(name) {
+  return import_node_process.default.env[name];
+}
+function emitNodeWarning(warning) {
+  import_node_process.default.emitWarning(warning);
+}
+const isBrowser = false;
+const isWebWorker = false;
+const isDeno = typeof import_node_process.default.versions.deno === "string" && import_node_process.default.versions.deno.length > 0;
+const isBun = typeof import_node_process.default.versions.bun === "string" && import_node_process.default.versions.bun.length > 0;
+const isNodeLike = true;
+const isNodeRuntime = !isBun && !isDeno;
+const isReactNative = false;
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
+//# sourceMappingURL=env.js.map
+
+
+/***/ }),
+
 /***/ 36836:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -142064,7 +142139,8 @@ __export(debug_exports, {
 });
 module.exports = __toCommonJS(debug_exports);
 var import_log = __nccwpck_require__(38029);
-const debugEnvVariable = typeof process !== "undefined" && process.env && process.env.DEBUG || void 0;
+var import_env = __nccwpck_require__(41573);
+const debugEnvVariable = (0, import_env.getEnvironmentVariable)("DEBUG");
 let enabledString;
 let enabledNamespaces = [];
 let skippedNamespaces = [];
@@ -142349,6 +142425,7 @@ __export(logger_exports, {
 });
 module.exports = __toCommonJS(logger_exports);
 var import_debug = __toESM(__nccwpck_require__(36836));
+var import_env = __nccwpck_require__(41573);
 const TYPESPEC_RUNTIME_LOG_LEVELS = ["verbose", "info", "warning", "error"];
 const levelMap = {
   verbose: 400,
@@ -142366,7 +142443,7 @@ function isTypeSpecRuntimeLogLevel(level) {
 }
 function createLoggerContext(options) {
   const registeredLoggers = /* @__PURE__ */ new Set();
-  const logLevelFromEnv = typeof process !== "undefined" && process.env && process.env[options.logLevelEnvVarName] || void 0;
+  const logLevelFromEnv = (0, import_env.getEnvironmentVariable)(options.logLevelEnvVarName);
   let logLevel;
   const clientLogger = (0, import_debug.default)(options.namespace);
   clientLogger.log = (...args) => {
@@ -142493,51 +142570,6 @@ function stringToUint8Array(value, format) {
 
 /***/ }),
 
-/***/ 85086:
-/***/ ((module) => {
-
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var checkEnvironment_exports = {};
-__export(checkEnvironment_exports, {
-  isBrowser: () => isBrowser,
-  isBun: () => isBun,
-  isDeno: () => isDeno,
-  isNodeLike: () => isNodeLike,
-  isNodeRuntime: () => isNodeRuntime,
-  isReactNative: () => isReactNative,
-  isWebWorker: () => isWebWorker
-});
-module.exports = __toCommonJS(checkEnvironment_exports);
-const isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
-const isWebWorker = typeof self === "object" && typeof self?.importScripts === "function" && (self.constructor?.name === "DedicatedWorkerGlobalScope" || self.constructor?.name === "ServiceWorkerGlobalScope" || self.constructor?.name === "SharedWorkerGlobalScope");
-const isDeno = typeof Deno !== "undefined" && typeof Deno.version !== "undefined" && typeof Deno.version.deno !== "undefined";
-const isBun = typeof Bun !== "undefined" && typeof Bun.version !== "undefined";
-const isNodeLike = typeof globalThis.process !== "undefined" && Boolean(globalThis.process.version) && Boolean(globalThis.process.versions?.node);
-const isNodeRuntime = isNodeLike && !isBun && !isDeno;
-const isReactNative = typeof navigator !== "undefined" && navigator?.product === "ReactNative";
-// Annotate the CommonJS export names for ESM import in node:
-0 && (0);
-//# sourceMappingURL=checkEnvironment.js.map
-
-
-/***/ }),
-
 /***/ 66776:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -142645,16 +142677,16 @@ __export(internal_exports, {
   computeSha256Hash: () => import_sha256.computeSha256Hash,
   computeSha256Hmac: () => import_sha256.computeSha256Hmac,
   getRandomIntegerInclusive: () => import_random.getRandomIntegerInclusive,
-  isBrowser: () => import_checkEnvironment.isBrowser,
-  isBun: () => import_checkEnvironment.isBun,
-  isDeno: () => import_checkEnvironment.isDeno,
+  isBrowser: () => import_env.isBrowser,
+  isBun: () => import_env.isBun,
+  isDeno: () => import_env.isDeno,
   isError: () => import_error.isError,
-  isNodeLike: () => import_checkEnvironment.isNodeLike,
-  isNodeRuntime: () => import_checkEnvironment.isNodeRuntime,
+  isNodeLike: () => import_env.isNodeLike,
+  isNodeRuntime: () => import_env.isNodeRuntime,
   isObject: () => import_object.isObject,
-  isReactNative: () => import_checkEnvironment.isReactNative,
-  isWebWorker: () => import_checkEnvironment.isWebWorker,
-  randomUUID: () => import_uuidUtils.randomUUID,
+  isReactNative: () => import_env.isReactNative,
+  isWebWorker: () => import_env.isWebWorker,
+  randomUUID: () => import_uuid.randomUUID,
   stringToUint8Array: () => import_bytesEncoding.stringToUint8Array,
   uint8ArrayToString: () => import_bytesEncoding.uint8ArrayToString
 });
@@ -142664,8 +142696,8 @@ var import_random = __nccwpck_require__(78640);
 var import_object = __nccwpck_require__(53632);
 var import_error = __nccwpck_require__(52573);
 var import_sha256 = __nccwpck_require__(2016);
-var import_uuidUtils = __nccwpck_require__(5023);
-var import_checkEnvironment = __nccwpck_require__(85086);
+var import_uuid = __nccwpck_require__(5023);
+var import_env = __nccwpck_require__(41573);
 var import_bytesEncoding = __nccwpck_require__(82921);
 var import_sanitizer = __nccwpck_require__(7784);
 // Annotate the CommonJS export names for ESM import in node:
