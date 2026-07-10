@@ -8,15 +8,15 @@ Black Duck Security Action allows you to integrate Static Analysis Security Test
 
 To use Black Duck Security Action, please follow the steps below:
 
-1. Configure GitHub as described in the [GitHub Prerequisites](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_github-prerequisites.html) page.
+1. Configure GitHub as described in the [GitHub Prerequisites](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/github-prerequisites.html) page.
   
 2. Install and configure Black Duck Security Action for the Black Duck product you are using. <br/>
-[Polaris](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_github-polaris.html) <br/>
-[Black Duck SCA](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_github-blackduck.html)  <br/>
-[Coverity](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_github-coverity.html) <br/>
-[SRM](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_github-srm.html) <br/>
+[Polaris](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/using-the-black-duck-security-scan-action-with-polaris.html) <br/>
+[Black Duck SCA](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/using-the-black-duck-security-scan-action-with-black-duck-sca.html)  <br/>
+[Coverity](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/using-the-black-duck-security-scan-action-with-coverity.html) <br/>
+[SRM](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/using-the-black-duck-security-scan-action-with-software-risk-manager.html) <br/>
 
-3. For additional configuration options, visit the [Additional GitHub Configuration](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_additional-github-parameters.html) page.
+3. For additional configuration options, visit the [Additional GitHub Configuration](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/additional-github-configuration.html) page.
 
 As an alternative to Black Duck Security Action, you also have the option to use Bridge CLI. <br/>
-Detailed documentation for Bridge CLI can be found [here](https://documentation.blackduck.com/bundle/bridge/page/documentation/c_overview.html).
+Detailed documentation for Bridge CLI can be found [here](https://docs.blackduck.com/r/bridge/latest/bridge-cli-guide/bridge-product-overview.html).

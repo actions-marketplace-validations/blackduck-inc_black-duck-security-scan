@@ -1,6 +1,6 @@
 {
   "name": "black-duck-security-scan",
-  "version": "2.10.0",
+  "version": "2.10.1",
   "private": true,
   "description": "Perform security scan using Blackduck Tools",
   "main": "lib/main.js",
@@ -53,7 +53,7 @@
     "@actions/tool-cache": "2.0.2",
     "@types/unzipper": "0.10.10",
     "actions-artifact-v1": "npm:@actions/artifact@1.1.0",
-    "actions-artifact-v2": "npm:@actions/artifact@2.1.8",
+    "actions-artifact-v2": "npm:@actions/artifact@2.3.2",
     "dom-parser": "0.1.6",
     "nock": "13.5.5",
     "typed-rest-client": "2.2.0",
@@ -69,7 +69,8 @@
     "flatted": "3.4.2",
     "actions-artifact-v2": {
       "ajv": "8.18.0",
-      "lodash": "4.18.1"
+      "lodash": "4.18.1",
+      "@azure/storage-blob": "12.17.0"
     },
     "actions-artifact-v1": {
       "ajv": "8.18.0"
