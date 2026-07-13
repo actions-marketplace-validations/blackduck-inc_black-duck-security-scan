@@ -116,6 +116,12 @@ export class BridgeToolsParameter {
       polData.data.polaris.artifactToUpload = inputs.POLARIS_ARTIFACT_TO_UPLOAD
     }
 
+    if (inputs.POLARIS_CONTAINER_NAME) {
+      polData.data.polaris.container = {
+        name: inputs.POLARIS_CONTAINER_NAME
+      }
+    }
+
     if (isBoolean(inputs.POLARIS_WAITFORSCAN)) {
       polData.data.polaris.waitForScan = parseToBoolean(inputs.POLARIS_WAITFORSCAN)
     }

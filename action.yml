@@ -93,7 +93,10 @@ inputs:
     description: 'Polaris SCA test type (SCA-SIGNATURE, SCA-PACKAGE, SCA-BINARY)'
     required: false
   polaris_artifactToUpload:
-    description: 'Path to binary or archive file for Polaris SCA Binary scan. Required when polaris_test_sca_type is set to SCA-BINARY.'
+    description: 'Path to a binary/archive/container file to analyze. This is required when using SCA-BINARY or SCA-CONTAINER as the SCA Test Type.'
+    required: false
+  polaris_container_name:
+    description: 'Container name for Polaris SCA Container scan. Required when polaris_test_sca_type is set to SCA-CONTAINER.'
     required: false
   polaris_test_sast_type:
     description: 'Polaris test type to trigger sigma rapid scan or full scan'
