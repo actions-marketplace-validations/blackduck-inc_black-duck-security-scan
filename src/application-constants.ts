@@ -49,7 +49,11 @@ export const DETECT_EXECUTION_PATH_KEY = 'detect_execution_path'
 // Coverity
 export const COVERITY_URL_KEY = 'coverity_url'
 export const COVERITY_USER_KEY = 'coverity_user'
+/**
+ * @deprecated Use coverity_password instead. This can be removed in future release.
+ */
 export const COVERITY_PASSPHRASE_KEY = 'coverity_passphrase'
+export const COVERITY_PASSWORD_KEY = 'coverity_password'
 export const COVERITY_PROJECT_NAME_KEY = 'coverity_project_name'
 export const COVERITY_STREAM_NAME_KEY = 'coverity_stream_name'
 export const COVERITY_INSTALL_DIRECTORY_KEY = 'coverity_install_directory'
@@ -103,10 +107,25 @@ export const POLARIS_ASSESSMENT_MODE_KEY = 'polaris_assessment_mode'
 export const POLARIS_TEST_SAST_LOCATION_KEY = 'polaris_test_sast_location'
 
 export const POLARIS_TEST_SCA_LOCATION_KEY = 'polaris_test_sca_location'
+export const POLARIS_ARTIFACT_TO_UPLOAD_KEY = 'polaris_artifactToUpload'
+export const POLARIS_CONTAINER_NAME_KEY = 'polaris_container_name'
 export const PROJECT_SOURCE_ARCHIVE_KEY = 'project_source_archive'
 export const PROJECT_SOURCE_PRESERVESYMLINKS_KEY = 'project_source_preserveSymLinks'
 export const PROJECT_SOURCE_EXCLUDES_KEY = 'project_source_excludes'
 export const PROJECT_DIRECTORY_KEY = 'project_directory'
+
+// Black Duck GitHub Issues fetch parameters
+export const POLARIS_EXTERNALISSUES_CREATE_KEY = 'polaris_externalIssues_create'
+export const POLARIS_EXTERNALISSUES_SEVERITIES_KEY = 'polaris_externalIssues_severities'
+export const POLARIS_EXTERNALISSUES_TYPES_KEY = 'polaris_externalIssues_types'
+export const POLARIS_EXTERNALISSUES_GROUPSCAISSUES_KEY = 'polaris_externalIssues_groupSCAIssues'
+export const POLARIS_EXTERNALISSUES_MAXCOUNT_KEY = 'polaris_externalIssues_maxCount'
+
+// Polaris Fix PR parameters
+export const POLARIS_FIXPR_ENABLED_KEY = 'polaris_fixpr_enabled'
+export const POLARIS_FIXPR_MAXCOUNT_KEY = 'polaris_fixpr_maxCount'
+export const POLARIS_FIXPR_UPGRADE_GUIDANCE_KEY = 'polaris_fixpr_useUpgradeGuidance'
+export const POLARIS_FIXPR_FILTER_SEVERITIES_KEY = 'polaris_fixpr_filter_severities'
 
 // Blackduck
 /**
@@ -221,6 +240,12 @@ export const BLACKDUCKSCA_POLICY_BADGES_CREATE_KEY = 'blackducksca_policy_badges
 export const BLACKDUCK_POLICY_BADGES_MAX_COUNT_KEY = 'blackduck_policy_badges_maxCount'
 export const BLACKDUCKSCA_POLICY_BADGES_MAX_COUNT_KEY = 'blackducksca_policy_badges_maxCount'
 
+// Black Duck GitHub Issues fetch parameters
+export const BLACKDUCKSCA_EXTERNALISSUES_CREATE_KEY = 'blackducksca_externalIssues_create'
+export const BLACKDUCKSCA_EXTERNALISSUES_SEVERITIES_KEY = 'blackducksca_externalIssues_severities'
+export const BLACKDUCKSCA_EXTERNALISSUES_GROUPSCAISSUES_KEY = 'blackducksca_externalIssues_groupSCAIssues'
+export const BLACKDUCKSCA_EXTERNALISSUES_MAXCOUNT_KEY = 'blackducksca_externalIssues_maxCount'
+
 export const GITHUB_HOST_URL_KEY = 'github_host_url'
 export const GITHUB_TOKEN_KEY = 'github_token'
 export const INCLUDE_DIAGNOSTICS_KEY = 'include_diagnostics'
@@ -247,7 +272,8 @@ export const RETRY_DELAY_IN_MILLISECONDS = 15000
 export const RETRY_COUNT = 3
 export const NON_RETRY_HTTP_CODES = new Set([200, 201, 401, 403, 416])
 export const GITHUB_CLOUD_URL = 'https://github.com'
-export const GITHUB_CLOUD_API_URL = 'https://api.github.com'
+export const GITHUB_DATA_RESIDENCY_SERVER_URL_PATTERN = /^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.ghe\.com$/
+export const GITHUB_CLOUD_API_DOMAIN_REGEX = /^https:\/\/api\.(github\.com|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.ghe\.com)$/
 export const BRIDGE_LOCAL_DIRECTORY = '.bridge'
 export const INTEGRATIONS_LOCAL_DIRECTORY = '.blackduck/integrations'
 export const BLACKDUCK_SARIF_GENERATOR_DIRECTORY = 'Blackduck SCA SARIF Generator'
@@ -282,8 +308,9 @@ export const POLARIS_PR_COMMENT_LOG_INFO_FOR_NON_PR_SCANS = 'Polaris PR Comment 
 export const COVERITY_PR_COMMENT_LOG_INFO_FOR_NON_PR_SCANS = 'Coverity PR Comment is ignored for non pull request scan'
 export const BLACKDUCK_PR_COMMENT_LOG_INFO_FOR_NON_PR_SCANS = 'Black Duck PR Comment is ignored for non pull request scan'
 export const BLACKDUCK_FIXPR_LOG_INFO_FOR_PR_SCANS = 'Black Duck Fix PR is ignored for pull request scan'
+export const POLARIS_FIXPR_LOG_INFO_FOR_PR_SCANS = 'Polaris Fix PR is ignored for pull request scan'
 export const GITHUB_TOKEN_VALIDATION_SARIF_UPLOAD_ERROR = 'Missing required GitHub token for uploading SARIF report to GitHub Advanced Security'
-export const MISSING_GITHUB_TOKEN_FOR_FIX_PR_AND_PR_COMMENT_ERROR = 'Missing required github token for fix pull request/pull request comments/Github Badges'
+export const MISSING_GITHUB_TOKEN_FOR_FIX_PR_AND_PR_COMMENT_ERROR = 'Missing required github token for fix pull request/pull request comments/Github Badges/GitHub Issues integration'
 export const BRIDGE_VERSION_NOT_FOUND_ERROR = 'Provided Bridge CLI version not found in artifactory'
 export const BRIDGE_CLI_URL_NOT_VALID_OS_ERROR = 'Provided Bridge CLI url is not valid for the configured '
 export const BRIDGE_CLI_URL_NOT_VALID_ERROR = 'Invalid URL'

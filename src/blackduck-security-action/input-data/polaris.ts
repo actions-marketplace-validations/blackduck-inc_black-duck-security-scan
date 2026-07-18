@@ -23,6 +23,17 @@ export interface CoverityArbitrary {
   args?: string
 }
 
+export interface PolarisFixPrData {
+  enabled?: boolean
+  maxCount?: number
+  useUpgradeGuidance?: string[]
+  filter?: PolarisFixPrFilterData
+}
+
+export interface PolarisFixPrFilterData {
+  severities?: string[]
+}
+
 export interface PolarisData extends Common {
   accesstoken: string
   serverUrl: string
@@ -31,9 +42,17 @@ export interface PolarisData extends Common {
   branch?: Branch
   assessment: {types: string[]}
   prComment?: PrComment
+  fixpr?: PolarisFixPrData
   test?: Test
   reports?: Reports
   policy?: Policy
+  externalIssues?: ExternalIssues
+  artifactToUpload?: string
+  container?: Container
+}
+
+export interface Container {
+  name?: string
 }
 
 export interface Policy {
@@ -72,4 +91,12 @@ export interface Test {
 interface TestDetails {
   type?: string | string[]
   location?: string
+}
+
+export interface ExternalIssues {
+  create?: boolean
+  severities?: string[]
+  types?: string[]
+  groupSCAIssues?: boolean
+  maxCount?: number
 }

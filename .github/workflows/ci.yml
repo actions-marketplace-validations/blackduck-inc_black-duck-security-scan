@@ -24,22 +24,22 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Set Node.js 20.x
-        uses: actions/setup-node@v4
+      - name: Set Node.js 24.x
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20.x
+          node-version: 24.x
           cache: 'npm'
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Install dependencies
         run: npm ci
 
       # Check dist/
       - name: Rebuild the dist/ directory
-        run: |
-          export NODE_OPTIONS=--openssl-legacy-provider
-          npm run build && npm run package
+        run: npm run build && npm run package
 
       - name: Compare the expected and actual dist/ directories
         id: dist-check
@@ -55,7 +55,7 @@ jobs:
 
       - name: Upload dist artifact on failure
         if: steps.dist-check.outputs.dist_failed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
           path: dist/
@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results
           path: test.json
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload coverage summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-summary
           path: coverage/coverage-summary.json
@@ -144,6 +144,21 @@ jobs:
 
   polaris:
     needs: ci
-    uses: ./.github/workflows/polaris.yml
-    secrets:
-      POLARIS_ACCESS_TOKEN: ${{ secrets.POLARIS_ACCESS_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Polaris Scan
+        id: polaris-scan
+        uses: blackduck-inc/black-duck-security-scan@659a0742e793a093377fab3117b0d90f23b04bfa # v2
+        with:
+          polaris_server_url: ${{ vars.POLARIS_SERVER_URL }}
+          polaris_access_token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
+          polaris_assessment_types: "SCA,SAST"
+          polaris_prComment_severities: "Critical,High,Medium,Low"
+          polaris_application_name: "integrations"
+          polaris_project_name: "blackduck-security-action"
+          polaris_prComment_enabled: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+     

@@ -11,8 +11,11 @@ inputs:
   coverity_user:
     description: 'Coverity user name'
     required: false
-  coverity_passphrase:
+  coverity_password:
     description: 'Coverity password'
+    required: false
+  coverity_passphrase:
+    description: 'Coverity password (deprecated, use coverity_password instead)'
     required: false
   coverity_project_name:
     description: 'Coverity Project Name'
@@ -87,7 +90,13 @@ inputs:
     description: 'Polaris parent branch name'
     required: false
   polaris_test_sca_type:
-    description: 'Polaris test type to trigger signature scan or package manager scan'
+    description: 'Polaris SCA test type (SCA-SIGNATURE, SCA-PACKAGE, SCA-BINARY)'
+    required: false
+  polaris_artifactToUpload:
+    description: 'Path to a binary/archive/container file to analyze. This is required when using SCA-BINARY or SCA-CONTAINER as the SCA Test Type.'
+    required: false
+  polaris_container_name:
+    description: 'Container name for Polaris SCA Container scan. Required when polaris_test_sca_type is set to SCA-CONTAINER.'
     required: false
   polaris_test_sast_type:
     description: 'Polaris test type to trigger sigma rapid scan or full scan'
@@ -121,6 +130,21 @@ inputs:
     required: false
   polaris_assessment_mode:
     description: 'The test mode type of this scan'
+    required: false
+  polaris_externalIssues_create:
+    description: 'Polaris External Issues Create'
+    required: false
+  polaris_externalIssues_types:
+    description: 'Polaris External Issues Types'
+    required: false
+  polaris_externalIssues_severities:
+    description: 'Polaris External Issues severities'
+    required: false
+  polaris_externalIssues_groupSCAIssues:
+    description: 'Polaris External Issues groupSCAIssues'
+    required: false
+  polaris_externalIssues_maxCount:
+    description: 'Polaris External Issues maxCount'
     required: false
   project_directory:
     description: 'The project source directory. Defaults to repository root directory. Set this to specify a custom folder that is other than repository root'
@@ -206,6 +230,19 @@ inputs:
   blackducksca_policy_badges_maxCount:
     description: 'To limit number of badges to be displayed on the GitHub repository'
     required: false
+  blackducksca_externalIssues_create:
+    description: 'Black Duck SCA External Issues Create'
+    required: false
+  blackducksca_externalIssues_severities:
+    description: 'Black Duck SCA External Issues severities'
+    required: false
+  blackducksca_externalIssues_groupSCAIssues:
+    description: 'Black Duck SCA External Issues groupSCAIssues'
+    required: false
+  blackducksca_externalIssues_maxCount:
+    description: 'Black Duck SCA External Issues maxCount'
+    required: false
+
   srm_url:
     description: 'SRM Url'
     required: false
@@ -257,6 +294,18 @@ inputs:
   polaris_policy_badges_maxCount:
     description: 'To limit number of badges to be displayed on the GitHub repository for polaris'
     required: false
+  polaris_fixpr_enabled:
+    description: 'Enable automatic fix pull request creation for Polaris SCA vulnerabilities'
+    required: false
+  polaris_fixpr_maxCount:
+    description: 'Maximum number of fix PRs to create on a branch. Default: 5'
+    required: false
+  polaris_fixpr_useUpgradeGuidance:
+    description: 'Upgrade guidance preference. Values: SHORT_TERM, LONG_TERM, or SHORT_TERM,LONG_TERM. Default: SHORT_TERM,LONG_TERM'
+    required: false
+  polaris_fixpr_filter_severities:
+    description: 'Comma-separated list of severities (CRITICAL, HIGH, MEDIUM, LOW). Default: CRITICAL,HIGH'
+    required: false
   mark_build_status:
     description: 'Specify the build status if policy violating issues are found.'
     required: false
@@ -271,5 +320,5 @@ outputs:
   status:
     description: 'The numeric exit code returned by the Black Duck Security Scan.'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'

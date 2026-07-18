@@ -81,11 +81,11 @@ export class GithubClientServiceBase implements GithubClientServiceInterface {
             retryCountLocal--
           } else {
             retryCountLocal = 0
-            throw new Error(responseBody)
+            throw new Error(`SARIF upload failed with unexpected status. Response status indicates an error.`)
           }
         } while (retryCountLocal > 0)
       } catch (error) {
-        throw new Error(constants.SARIF_GAS_UPLOAD_FAILED_ERROR + error)
+        throw new Error(`${constants.SARIF_GAS_UPLOAD_FAILED_ERROR}${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     } else if (!checkIfPathExists(sarifFilePath)) {
       info(`SARIF report is not available: ${sarifFilePath}`)
@@ -101,7 +101,8 @@ export class GithubClientServiceBase implements GithubClientServiceInterface {
       ref: this.githubRef,
       sarif: base64Sarif
     }
-    if (this.githubApiURL === constants.GITHUB_CLOUD_API_URL) {
+    const isCloud = constants.GITHUB_CLOUD_API_DOMAIN_REGEX.test(this.githubApiURL)
+    if (isCloud) {
       data.validate = true
     }
     return data

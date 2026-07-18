@@ -3,10 +3,9 @@ import {tmpdir} from 'os'
 import {uploadDiagnostics, uploadSarifReportAsArtifact} from '../../../src/blackduck-security-action/artifacts'
 import * as inputs from '../../../src/blackduck-security-action/inputs'
 import * as artifact from 'actions-artifact-v2/lib/artifact'
-const fs = require('fs')
-import * as core from '@actions/core'
 import * as utility from '../../../src/blackduck-security-action/utility'
-import * as ioUtil from '@actions/io/lib/io-util'
+
+const fs = require('fs')
 
 // Mock the artifact module
 jest.mock('actions-artifact-v2', () => ({
@@ -40,12 +39,12 @@ describe('uploadDiagnostics - success', () => {
     jest.spyOn(artifact, 'DefaultArtifactClient').mockReturnValue(mockArtifactClient as artifact.ArtifactClient)
     jest.spyOn(fs, 'existsSync').mockReturnValue(true)
     jest.spyOn(fs, 'readdirSync').mockReturnValue(['bridge.log'])
-    jest.spyOn(configVariables, 'getGitHubWorkspaceDir').mockReturnValue('.')
+    jest.spyOn(configVariables, 'getGitHubWorkspaceDir').mockReturnValue('./test')
 
     await uploadDiagnostics()
 
     expect(mockUploadArtifact).toHaveBeenCalledTimes(1)
-    expect(mockUploadArtifact).toHaveBeenCalledWith('bridge_diagnostics_1749123407519', ['./.bridge/bridge.log'], './.bridge', {})
+    expect(mockUploadArtifact).toHaveBeenCalledWith('bridge_diagnostics_1749123407519', ['./test/.bridge/bridge.log'], './test/.bridge', {})
   })
 })
 
@@ -56,7 +55,7 @@ test('Test uploadDiagnostics expect API error', () => {
 
   const dir = (fs.readdirSync = jest.fn())
   dir.mockReturnValue(files)
-  jest.spyOn(fs.statSync('./.bridge/bridge.log'), 'isDirectory').mockReturnValue(false)
+  jest.spyOn(fs.statSync('./test/.bridge/bridge.log'), 'isDirectory').mockReturnValue(false)
   uploadDiagnostics().catch(Error)
 })
 
@@ -67,7 +66,7 @@ test('Test uploadDiagnostics - invalid value for retention days', () => {
 
   const dir = (fs.readdirSync = jest.fn())
   dir.mockReturnValue(files)
-  jest.spyOn(fs.statSync('./.bridge/bridge.log'), 'isDirectory').mockReturnValue(false)
+  jest.spyOn(fs.statSync('./test/.bridge/bridge.log'), 'isDirectory').mockReturnValue(false)
   uploadDiagnostics().catch(Error)
 })
 
@@ -93,3 +92,4 @@ describe('uploadSarifReport', () => {
     expect(mockUploadArtifact).toHaveBeenCalledWith(artifactName, [userSarifFilePath], '.', {})
   })
 })
+

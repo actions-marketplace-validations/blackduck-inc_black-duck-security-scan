@@ -3,13 +3,13 @@ import path from 'path'
 import {debug, info} from '@actions/core'
 import {isNullOrEmptyValue, validateBlackduckFailureSeverities, validateCoverityInstallDirectoryParam} from './validators'
 import * as inputs from './inputs'
-import {Polaris} from './input-data/polaris'
+import {Polaris, PolarisFixPrData, PolarisFixPrFilterData} from './input-data/polaris'
 import {InputData} from './input-data/input-data'
 import {Coverity, CoverityDetect} from './input-data/coverity'
 import {BlackDuckSCA, BLACKDUCKSCA_SCAN_FAILURE_SEVERITIES, BlackDuckDetect, BlackDuckFixPrData} from './input-data/blackduck'
 import {GithubData} from './input-data/github'
 import * as constants from '../application-constants'
-import {isBoolean, isPullRequestEvent, parseToBoolean} from './utility'
+import {isBoolean, isPullRequestEvent, parseToBoolean, isGitHubCloud} from './utility'
 import {SRM} from './input-data/srm'
 import {Network} from './input-data/common'
 
@@ -35,7 +35,7 @@ export class BridgeToolsParameter {
   }
   getFormattedCommandForPolaris(githubRepoName: string): string {
     let command = ''
-    const customHeader = process.env[constants.GITHUB_ENVIRONMENT_VARIABLES.GITHUB_SERVER_URL] === constants.GITHUB_CLOUD_URL ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
+    const customHeader = isGitHubCloud() ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
     const assessmentTypeArray: string[] = []
     if (inputs.POLARIS_ASSESSMENT_TYPES) {
       // converting provided assessmentTypes to uppercase
@@ -59,6 +59,7 @@ export class BridgeToolsParameter {
     if (isNullOrEmptyValue(applicationName)) {
       applicationName = githubRepoName
     }
+
     debug(`Polaris application name: ${applicationName}`)
     debug(`Polaris project name: ${projectName}`)
 
@@ -87,6 +88,8 @@ export class BridgeToolsParameter {
 
     if (inputs.POLARIS_BRANCH_NAME) {
       polData.data.polaris.branch = {name: inputs.POLARIS_BRANCH_NAME}
+    } else {
+      polData.data.polaris.branch = {name: this.getGithubBranchName()}
     }
 
     if (inputs.POLARIS_TEST_SCA_TYPE || inputs.POLARIS_TEST_SAST_TYPE || inputs.POLARIS_TEST_SCA_LOCATION || inputs.POLARIS_TEST_SAST_LOCATION) {
@@ -106,6 +109,16 @@ export class BridgeToolsParameter {
           }),
           ...(inputs.POLARIS_TEST_SAST_LOCATION && {location: inputs.POLARIS_TEST_SAST_LOCATION})
         }
+      }
+    }
+
+    if (inputs.POLARIS_ARTIFACT_TO_UPLOAD) {
+      polData.data.polaris.artifactToUpload = inputs.POLARIS_ARTIFACT_TO_UPLOAD
+    }
+
+    if (inputs.POLARIS_CONTAINER_NAME) {
+      polData.data.polaris.container = {
+        name: inputs.POLARIS_CONTAINER_NAME
       }
     }
 
@@ -194,6 +207,67 @@ export class BridgeToolsParameter {
       } else {
         /** Log info if Polaris PR comment is enabled in case of non PR context */
         info(constants.POLARIS_PR_COMMENT_LOG_INFO_FOR_NON_PR_SCANS)
+      }
+    }
+
+    // Polaris Fix PR
+    if (parseToBoolean(inputs.POLARIS_FIXPR_ENABLED)) {
+      if (!isPrEvent) {
+        /** Set Polaris Fix PR inputs in case of non PR context */
+        info('Polaris Fix PR is enabled')
+        polData.data.polaris.fixpr = this.setPolarisFixPrInputs()
+        polData.data.github = this.getGithubRepoInfo()
+        // Set project directory to current directory if not already set to help Bridge CLI resolve file paths correctly for FixPR
+        if (!inputs.PROJECT_DIRECTORY && !polData.data.project) {
+          polData.data.project = {directory: '.'}
+        } else if (!inputs.PROJECT_DIRECTORY && polData.data.project && !polData.data.project.directory) {
+          polData.data.project.directory = '.'
+        }
+      } else {
+        info(constants.POLARIS_FIXPR_LOG_INFO_FOR_PR_SCANS)
+      }
+    }
+
+    // Github Issues Input parameters
+    if (inputs.POLARIS_EXTERNALISSUES_CREATE || inputs.POLARIS_EXTERNALISSUES_TYPES || inputs.POLARIS_EXTERNALISSUES_GROUPSCAISSUES || inputs.POLARIS_EXTERNALISSUES_SEVERITIES || inputs.POLARIS_EXTERNALISSUES_MAXCOUNT) {
+      polData.data.polaris.externalIssues = {}
+      if (inputs.POLARIS_EXTERNALISSUES_CREATE !== '' && inputs.POLARIS_EXTERNALISSUES_CREATE !== undefined) {
+        if (parseToBoolean(inputs.POLARIS_EXTERNALISSUES_CREATE)) {
+          polData.data.github = this.getGithubRepoInfo()
+        }
+        polData.data.polaris.externalIssues.create = parseToBoolean(inputs.POLARIS_EXTERNALISSUES_CREATE)
+      }
+      if (inputs.POLARIS_EXTERNALISSUES_SEVERITIES) {
+        const externalIssuesSeverities: string[] = []
+        const inputExternalIssuesSeverities = inputs.POLARIS_EXTERNALISSUES_SEVERITIES
+        if (inputExternalIssuesSeverities != null && inputExternalIssuesSeverities.length > 0) {
+          const severityValues = inputExternalIssuesSeverities.split(',')
+          for (const severity of severityValues) {
+            if (severity.trim()) {
+              externalIssuesSeverities.push(severity.trim())
+            }
+          }
+        }
+        polData.data.polaris.externalIssues.severities = externalIssuesSeverities
+      }
+      if (inputs.POLARIS_EXTERNALISSUES_TYPES) {
+        const externalIssuesTypes: string[] = []
+        const inputExternalIssuesTypes = inputs.POLARIS_EXTERNALISSUES_TYPES
+        if (inputExternalIssuesTypes != null && inputExternalIssuesTypes.length > 0) {
+          const typesValues = inputExternalIssuesTypes.split(',')
+          for (const type of typesValues) {
+            if (type.trim()) {
+              externalIssuesTypes.push(type.trim())
+            }
+          }
+        }
+        polData.data.polaris.externalIssues.types = externalIssuesTypes
+      }
+      if (inputs.POLARIS_EXTERNALISSUES_GROUPSCAISSUES !== '' && inputs.POLARIS_EXTERNALISSUES_GROUPSCAISSUES !== undefined) {
+        polData.data.polaris.externalIssues.groupSCAIssues = parseToBoolean(inputs.POLARIS_EXTERNALISSUES_GROUPSCAISSUES)
+      }
+      if (Number.isInteger(parseInt(inputs.POLARIS_EXTERNALISSUES_MAXCOUNT))) {
+        polData.data.polaris.externalIssues.maxCount = parseInt(inputs.POLARIS_EXTERNALISSUES_MAXCOUNT)
       }
     }
     if (!isPrEvent) {
@@ -287,7 +361,7 @@ export class BridgeToolsParameter {
 
   getFormattedCommandForCoverity(githubRepoName: string): string {
     let command = ''
-    const customHeader = process.env[constants.GITHUB_ENVIRONMENT_VARIABLES.GITHUB_SERVER_URL] === constants.GITHUB_CLOUD_URL ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
+    const customHeader = isGitHubCloud() ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
     let coverityStreamName = inputs.COVERITY_STREAM_NAME
     const isPrEvent = isPullRequestEvent()
 
@@ -394,7 +468,7 @@ export class BridgeToolsParameter {
 
   getFormattedCommandForBlackduck(): string {
     const failureSeverities: string[] = []
-    const customHeader = process.env[constants.GITHUB_ENVIRONMENT_VARIABLES.GITHUB_SERVER_URL] === constants.GITHUB_CLOUD_URL ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
+    const customHeader = isGitHubCloud() ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
     if (inputs.BLACKDUCKSCA_SCAN_FAILURE_SEVERITIES != null && inputs.BLACKDUCKSCA_SCAN_FAILURE_SEVERITIES.length > 0) {
       try {
         const failureSeveritiesInput = inputs.BLACKDUCKSCA_SCAN_FAILURE_SEVERITIES
@@ -554,6 +628,35 @@ export class BridgeToolsParameter {
     }
 
     blackduckData.data.network = this.setNetworkObj()
+    // Github Issues Input parameters
+    if (inputs.BLACKDUCKSCA_EXTERNALISSUES_CREATE || inputs.BLACKDUCKSCA_EXTERNALISSUES_GROUPSCAISSUES || inputs.BLACKDUCKSCA_EXTERNALISSUES_SEVERITIES || inputs.BLACKDUCKSCA_EXTERNALISSUES_MAXCOUNT) {
+      blackduckData.data.blackducksca.externalIssues = {}
+      if (inputs.BLACKDUCKSCA_EXTERNALISSUES_CREATE !== '' && inputs.BLACKDUCKSCA_EXTERNALISSUES_CREATE !== undefined) {
+        if (parseToBoolean(inputs.BLACKDUCKSCA_EXTERNALISSUES_CREATE)) {
+          blackduckData.data.github = this.getGithubRepoInfo()
+        }
+        blackduckData.data.blackducksca.externalIssues.create = parseToBoolean(inputs.BLACKDUCKSCA_EXTERNALISSUES_CREATE)
+      }
+      if (inputs.BLACKDUCKSCA_EXTERNALISSUES_SEVERITIES) {
+        const externalIssuesSeverities: string[] = []
+        const inputExternalIssuesSeverities = inputs.BLACKDUCKSCA_EXTERNALISSUES_SEVERITIES
+        if (inputExternalIssuesSeverities != null && inputExternalIssuesSeverities.length > 0) {
+          const severityValues = inputExternalIssuesSeverities.split(',')
+          for (const severity of severityValues) {
+            if (severity.trim()) {
+              externalIssuesSeverities.push(severity.trim())
+            }
+          }
+        }
+        blackduckData.data.blackducksca.externalIssues.severities = externalIssuesSeverities
+      }
+      if (inputs.BLACKDUCKSCA_EXTERNALISSUES_GROUPSCAISSUES !== '' && inputs.BLACKDUCKSCA_EXTERNALISSUES_GROUPSCAISSUES !== undefined) {
+        blackduckData.data.blackducksca.externalIssues.groupSCAIssues = parseToBoolean(inputs.BLACKDUCKSCA_EXTERNALISSUES_GROUPSCAISSUES)
+      }
+      if (Number.isInteger(parseInt(inputs.BLACKDUCKSCA_EXTERNALISSUES_MAXCOUNT))) {
+        blackduckData.data.blackducksca.externalIssues.maxCount = parseInt(inputs.BLACKDUCKSCA_EXTERNALISSUES_MAXCOUNT)
+      }
+    }
 
     blackduckData.data.detect = Object.assign({}, this.setDetectArgs(), blackduckData.data.detect)
 
@@ -570,7 +673,7 @@ export class BridgeToolsParameter {
 
   getFormattedCommandForSRM(githubRepoName: string): string {
     let command = ''
-    const customHeader = process.env[constants.GITHUB_ENVIRONMENT_VARIABLES.GITHUB_SERVER_URL] === constants.GITHUB_CLOUD_URL ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
+    const customHeader = isGitHubCloud() ? constants.INTEGRATIONS_GITHUB_CLOUD : constants.INTEGRATIONS_GITHUB_EE
     let assessmentTypes: string[] = []
     if (inputs.SRM_ASSESSMENT_TYPES) {
       assessmentTypes = inputs.SRM_ASSESSMENT_TYPES.split(',')
@@ -692,7 +795,8 @@ export class BridgeToolsParameter {
 
   private getGithubBranchName(): string {
     let branchName = ''
-    if (parseToBoolean(inputs.POLARIS_PRCOMMENT_ENABLED)) {
+    const isPrEvent = isPullRequestEvent()
+    if (parseToBoolean(inputs.POLARIS_PRCOMMENT_ENABLED) && isPrEvent) {
       // Only polaris use case
       branchName = process.env[constants.GITHUB_ENVIRONMENT_VARIABLES.GITHUB_HEAD_REF] || ''
     } else {
@@ -780,6 +884,52 @@ export class BridgeToolsParameter {
       blackDuckFixPrData.filter = {severities: fixPRFilterSeverities}
     }
     return blackDuckFixPrData
+  }
+
+  private setPolarisFixPrInputs(): PolarisFixPrData | undefined {
+    // Validate maxCount is a number
+    if (inputs.POLARIS_FIXPR_MAXCOUNT && isNaN(Number(inputs.POLARIS_FIXPR_MAXCOUNT))) {
+      throw new Error(constants.INVALID_VALUE_ERROR.concat(constants.POLARIS_FIXPR_MAXCOUNT_KEY))
+    }
+
+    const polarisFixPrData: PolarisFixPrData = {
+      enabled: true
+    }
+
+    // Set maxCount only if provided by user (Bridge CLI default: 5)
+    if (inputs.POLARIS_FIXPR_MAXCOUNT) {
+      polarisFixPrData.maxCount = Number(inputs.POLARIS_FIXPR_MAXCOUNT)
+    }
+
+    // Set upgrade guidance only if provided by user (Bridge CLI default: SHORT_TERM,LONG_TERM)
+    const useUpgradeGuidance: string[] = []
+    if (inputs.POLARIS_FIXPR_UPGRADE_GUIDANCE) {
+      const upgradeGuidanceList = inputs.POLARIS_FIXPR_UPGRADE_GUIDANCE.split(',')
+      for (const guidance of upgradeGuidanceList) {
+        if (guidance && guidance.trim() !== '') {
+          useUpgradeGuidance.push(guidance.trim())
+        }
+      }
+      polarisFixPrData.useUpgradeGuidance = useUpgradeGuidance
+    }
+
+    // Set filter.severities if provided by user (Bridge CLI default: CRITICAL,HIGH)
+    if (inputs.POLARIS_FIXPR_FILTER_SEVERITIES) {
+      const severities: string[] = []
+      const filterSeverities = inputs.POLARIS_FIXPR_FILTER_SEVERITIES.split(',')
+      for (const severity of filterSeverities) {
+        if (severity && severity.trim() !== '') {
+          severities.push(severity.trim())
+        }
+      }
+      if (severities.length > 0) {
+        polarisFixPrData.filter = {
+          severities: severities
+        }
+      }
+    }
+
+    return polarisFixPrData
   }
 
   private setCoverityDetectArgs(): CoverityDetect {

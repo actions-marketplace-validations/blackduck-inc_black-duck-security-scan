@@ -9,10 +9,10 @@ import {GithubClientServiceV1} from '../service/impl/enterprise/v1/github-client
 import {getSharedHttpClient} from '../utility'
 
 export const GitHubClientServiceFactory = {
-  DEFAULT_VERSION: '3.17',
+  DEFAULT_VERSION: '3.18',
   // V1 will have all currently supported versions
   // {V2, V3 ... Vn} will have breaking changes
-  SUPPORTED_VERSIONS_V1: ['3.15', '3.16', '3.17'],
+  SUPPORTED_VERSIONS_V1: ['3.16', '3.17', '3.18'],
   // Add new version here
 
   async fetchVersion(githubApiUrl: string): Promise<string> {
@@ -44,8 +44,10 @@ export const GitHubClientServiceFactory = {
   async getGitHubClientServiceInstance(): Promise<GithubClientServiceInterface> {
     info('Fetching GitHub client service instance...')
     const githubApiUrl = process.env[constants.GITHUB_ENVIRONMENT_VARIABLES.GITHUB_API_URL] || ''
-
-    if (githubApiUrl === constants.GITHUB_CLOUD_API_URL) {
+    // Treat GitHub Cloud and GHEC (data residency) domains as cloud
+    // Use regex to match api.github.com (cloud) and api.<subdomain>.ghe.com (data residency) domains as cloud
+    const isCloud = constants.GITHUB_CLOUD_API_DOMAIN_REGEX.test(githubApiUrl)
+    if (isCloud) {
       debug(`Using GitHub client service Cloud instance`)
       return new GithubClientServiceCloud()
     } else {
